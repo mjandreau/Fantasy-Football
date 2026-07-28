@@ -28,7 +28,7 @@ def _accumulate(games):
     return acc
 
 
-def standings(games, season=None):
+def standings(games, season=None, min_games=40):
     acc = _accumulate(_regular(games, season))
     rows = []
     for owner, a in acc.items():
@@ -44,9 +44,22 @@ def standings(games, season=None):
     for r in rows:
         pi = ((r["avg_score"] / league_avg) * 80 + r["win_pct"] * 100) * (1 / 7) if league_avg else 0.0
         r["power_index"] = round(pi, 4)
+    # All-time (season is None) applies the games qualifier so tiny-sample
+    # historical owners don't top the leaderboard; per-season ranks everyone.
+    apply_qualifier = season is None
+    for r in rows:
+        r["qualified"] = (r["games"] >= min_games) if apply_qualifier else True
     rows.sort(key=lambda r: r["power_index"], reverse=True)
-    for i, r in enumerate(rows, 1):
-        r["power_rank"] = i
+    rank = 0
+    for r in rows:
+        if r["qualified"]:
+            rank += 1
+            r["power_rank"] = rank
+        else:
+            r["power_rank"] = None
+    # qualified first (by rank), then unqualified by Power Index desc
+    rows.sort(key=lambda r: (r["power_rank"] is None,
+                             r["power_rank"] if r["power_rank"] is not None else -r["power_index"]))
     return rows
 
 
