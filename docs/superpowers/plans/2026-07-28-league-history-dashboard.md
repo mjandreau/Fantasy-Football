@@ -29,7 +29,7 @@
              "home_owner": "Walter", "home_team": "Herbie Fully Loaded", "home_score": 152.8,
              "away_owner": "Buffalo Joe", "away_team": "Fields and Streams", "away_score": 212.6,
              "winner": "Buffalo Joe", "loser": "Walter", "margin": 59.8, "tie": false,
-             "gridiron_conflict": false}],
+             "gridiron_conflict": false, "gridiron_missing": false}],
   "champions": {"2025": {"champion": "Walter", "last_place": "Devin"}},
   "team_names": {"2025": {"Walter": "Herbie Fully Loaded"}},
   "all_time_standings": [{"owner": "Walter", "wins": 0, "losses": 0, "ties": 0, "win_pct": 0.0,
@@ -623,8 +623,8 @@ Compare each regular-season game to Gridiron. League History always wins; flag `
 **Interfaces:**
 - Consumes: `parse_gridiron` (Task 5); games list (Task 4).
 - Produces:
-  - `flag_conflicts(games, gridiron) -> list[dict]` — returns games with a `gridiron_conflict` bool added to every game (playoffs always False — Gridiron has no playoffs).
-  - `reconciliation_report(games) -> str` — Markdown summarizing conflicts and missing-from-Gridiron counts per season.
+  - `flag_conflicts(games, gridiron) -> list[dict]` — adds two bools to EVERY game: `gridiron_conflict` (regular-season game whose score differs from Gridiron) and `gridiron_missing` (regular-season game with no matching Gridiron entry — e.g. 2025 wk10+). Both False for playoffs (Gridiron has no playoffs).
+  - `reconciliation_report(games) -> str` — Markdown summarizing conflicts per season, missing-from-Gridiron counts per season, and a conflict-detail table.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -651,6 +651,18 @@ def test_reconciliation_report_is_markdown(league_history_path, gridiron_path):
     report = reconciliation_report(games)
     assert report.startswith("#")
     assert "2021" in report
+    assert "not found in Gridiron" in report
+
+def test_flag_conflicts_marks_missing(league_history_path, gridiron_path):
+    flagged = flag_conflicts(build_games(league_history_path), parse_gridiron(gridiron_path))
+    assert all("gridiron_missing" in g for g in flagged)
+    def missing(season):
+        return sum(1 for g in flagged
+                   if g["season"] == season and g["phase"] == "regular" and g["gridiron_missing"])
+    assert missing(2019) == 0    # Gridiron has all of 2019 regular season
+    assert missing(2025) >= 30   # Gridiron froze ~wk9; wk10-14 (5 wks x 6) absent
+    # playoffs are never "missing"
+    assert all(not g["gridiron_missing"] for g in flagged if g["phase"] == "playoff")
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
@@ -667,25 +679,34 @@ from collections import Counter
 def flag_conflicts(games, gridiron):
     for g in games:
         conflict = False
+        missing = False
         if g["phase"] == "regular":
             key = (g["season"], g["week"], frozenset({g["home_owner"], g["away_owner"]}))
             gr = gridiron.get(key)
-            if gr is not None:
+            if gr is None:
+                missing = True
+            else:
                 gh = gr.get(g["home_owner"])
                 ga = gr.get(g["away_owner"])
-                if gh is not None and ga is not None:
+                if gh is None or ga is None:
+                    missing = True
+                else:
                     conflict = (gh != g["home_score"]) or (ga != g["away_score"])
         g["gridiron_conflict"] = conflict
+        g["gridiron_missing"] = missing
     return games
 
 
 def reconciliation_report(games):
     per_season = Counter()
+    missing_per = Counter()
     details = []
     for g in games:
         if g.get("gridiron_conflict"):
             per_season[g["season"]] += 1
             details.append(g)
+        if g.get("gridiron_missing"):
+            missing_per[g["season"]] += 1
     lines = ["# Score Reconciliation Report",
              "",
              "League Schedule History is authoritative; the games below differ from "
@@ -696,7 +717,12 @@ def reconciliation_report(games):
         lines.append(f"- {season}: {per_season[season]} conflicting game(s)")
     if not per_season:
         lines.append("- None — sources agree on all overlapping regular-season games.")
-    lines += ["", "## Detail", "",
+    lines += ["", "## Regular-season games not found in Gridiron", ""]
+    for season in sorted(missing_per):
+        lines.append(f"- {season}: {missing_per[season]} game(s) absent from Gridiron")
+    if not missing_per:
+        lines.append("- None — Gridiron covers every regular-season game.")
+    lines += ["", "## Conflict detail", "",
               "| Season | Wk | Matchup | League Hist (home/away) |"]
     lines.append("|---|---|---|---|")
     for g in sorted(details, key=lambda x: (x["season"], x["week"])):
