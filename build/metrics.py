@@ -53,8 +53,6 @@ def standings(games, season=None):
 def head_to_head(games):
     out = {}
     for g in games:
-        if g["tie"] is None:
-            pass
         a, b = sorted([g["home_owner"], g["away_owner"]])
         key = f"{a}|{b}"
         rec = out.setdefault(key, {"a": a, "b": b, "a_wins": 0, "b_wins": 0,
@@ -112,11 +110,10 @@ def record_book(games, limit=15):
     hi_comb = sorted(combined, key=lambda x: x["total"], reverse=True)[:limit]
     return {"highest_scores": highest, "lowest_scores": lowest,
             "biggest_margins": biggest, "closest_games": closest,
-            "highest_combined": hi_comb, "ties": ties}
+            "highest_combined": hi_comb, "ties": ties[:limit]}
 
 
 def owner_careers(games, champions):
-    from collections import defaultdict
     owners = sorted({g["home_owner"] for g in games} | {g["away_owner"] for g in games})
     titles = defaultdict(list)
     lasts = defaultdict(list)
