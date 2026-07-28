@@ -13,6 +13,7 @@
 - **Primary data source:** `League Schedule History.xlsx`. It wins ALL score conflicts. `The Gridiron.xlsx` is validation + Power Index formula + (fallback) champions only.
 - **Standings & Power Index use regular-season games only** (`phase == "regular"`, Weeks 1–14). Playoffs feed champions, record book, and H2H history — never regular-season standings.
 - **Power Index formula (exact):** `PI = ((AvgScore / league_avg(AvgScore)) * 80 + Win% * 100) * (1/7)`, where `AvgScore = PointsFor / Games` and `league_avg(AvgScore)` = mean of per-owner average scores in scope (season or all-time). `PowerRank` = descending rank of PI within scope.
+- **All-time games qualifier:** in the ALL-TIME standings only, an owner needs ≥ **40 regular-season games** (~3 seasons) to receive a numeric Power Rank. Unqualified owners (tiny-sample historical owners, e.g. Joe Kosich with 1 season) still appear with full stats but `power_rank = null` and `qualified = false`, sorted after the ranked owners. Per-SEASON standings rank everyone (no qualifier; `qualified = true` for all).
 - **12 active owners** (short names): Baker, Buffalo Joe, Devin, Joe Klim, Joe Ricci, Luke, Matt, Nolan, Pel, Reid, Spark, Walter.
 - **3 historical owners** (played only the 2011–2014 10-team era, then left): Chris Borea, Joe Kosich, Tucker. **15 all-time owners** total. Standings/records/H2H/careers include all 15; UI flags historical owners as inactive (via `meta.active_owners`). Early seasons (2011–2014) correctly show 10 teams. "Dan Borea" (schedule) and "Chris Borea" (Gridiron) are the same person → displayed as **Chris Borea**.
 - **Source `.xlsx` files stay local** (gitignored). The dashboard must work standalone with data embedded.
@@ -34,7 +35,7 @@
   "team_names": {"2025": {"Walter": "Herbie Fully Loaded"}},
   "all_time_standings": [{"owner": "Walter", "wins": 0, "losses": 0, "ties": 0, "win_pct": 0.0,
                           "pf": 0.0, "pa": 0.0, "games": 0, "avg_score": 0.0,
-                          "power_index": 0.0, "power_rank": 1}],
+                          "power_index": 0.0, "power_rank": 1, "qualified": true}],
   "season_standings": {"2025": ["...same shape as all_time_standings..."]},
   "head_to_head": {"Matt|Walter": {"a": "Matt", "b": "Walter", "a_wins": 0, "b_wins": 0, "ties": 0,
                                    "games": 0, "a_avg": 0.0, "b_avg": 0.0,
@@ -833,7 +834,7 @@ git commit -m "feat: curated champions and last-place constants"
 **Interfaces:**
 - Consumes: games list (with `phase`).
 - Produces:
-  - `standings(games, season=None) -> list[dict]` — regular-season standings sorted by Power Rank. When `season` is None, all-time; else that season. Each row: owner, wins, losses, ties, win_pct, pf, pa, games, avg_score, power_index, power_rank. Uses **regular-season games only**.
+  - `standings(games, season=None, min_games=40) -> list[dict]` — regular-season standings sorted by Power Rank. When `season` is None, all-time (applies the games qualifier); else that season (ranks everyone). Each row: owner, wins, losses, ties, win_pct, pf, pa, games, avg_score, power_index, power_rank (int, or None if unqualified), qualified (bool). Uses **regular-season games only**.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -847,16 +848,27 @@ def test_all_time_standings_structure(league_history_path):
     assert len(rows) == 15
     top = rows[0]
     for k in ("owner", "wins", "losses", "ties", "win_pct", "pf", "pa",
-              "games", "avg_score", "power_index", "power_rank"):
+              "games", "avg_score", "power_index", "power_rank", "qualified"):
         assert k in top
-    assert top["power_rank"] == 1
-    # ranks are 1..15 unique
-    assert sorted(r["power_rank"] for r in rows) == list(range(1, 16))
+    assert top["power_rank"] == 1 and top["qualified"] is True
+    # qualified owners get contiguous ranks 1..N; unqualified get None, sorted last
+    ranked = [r["power_rank"] for r in rows if r["power_rank"] is not None]
+    assert ranked == list(range(1, len(ranked) + 1))
+    assert all(r["qualified"] for r in rows if r["power_rank"] is not None)
+    # sub-40-game owners are unqualified with no rank; Joe Kosich (1 season) is one
+    assert all((not r["qualified"]) and r["power_rank"] is None
+               for r in rows if r["games"] < 40)
+    kos = next(r for r in rows if r["owner"] == "Joe Kosich")
+    assert kos["qualified"] is False and kos["power_rank"] is None
+    assert next(r for r in rows if r["owner"] == "Walter")["qualified"] is True
 
 def test_early_season_has_ten_teams(league_history_path):
     from build.games import build_games
     rows = standings(build_games(league_history_path), season=2011)
     assert len(rows) == 10  # 10-team era
+    # per-season ranks everyone (no games qualifier)
+    assert all(r["qualified"] for r in rows)
+    assert sorted(r["power_rank"] for r in rows) == list(range(1, 11))
 
 def test_standings_regular_season_only(league_history_path):
     games = build_games(league_history_path)
@@ -870,6 +882,8 @@ def test_season_standings_2025(league_history_path):
     games = build_games(league_history_path)
     rows = standings(games, season=2025)
     assert len(rows) == 12
+    assert all(r["qualified"] for r in rows)
+    assert sorted(r["power_rank"] for r in rows) == list(range(1, 13))
     assert sum(r["games"] for r in rows) == sum(
         1 for g in games if g["season"] == 2025 and g["phase"] == "regular") * 2
 
@@ -915,7 +929,7 @@ def _accumulate(games):
     return acc
 
 
-def standings(games, season=None):
+def standings(games, season=None, min_games=40):
     acc = _accumulate(_regular(games, season))
     rows = []
     for owner, a in acc.items():
@@ -931,9 +945,22 @@ def standings(games, season=None):
     for r in rows:
         pi = ((r["avg_score"] / league_avg) * 80 + r["win_pct"] * 100) * (1 / 7) if league_avg else 0.0
         r["power_index"] = round(pi, 4)
+    # All-time (season is None) applies the games qualifier so tiny-sample
+    # historical owners don't top the leaderboard; per-season ranks everyone.
+    apply_qualifier = season is None
+    for r in rows:
+        r["qualified"] = (r["games"] >= min_games) if apply_qualifier else True
     rows.sort(key=lambda r: r["power_index"], reverse=True)
-    for i, r in enumerate(rows, 1):
-        r["power_rank"] = i
+    rank = 0
+    for r in rows:
+        if r["qualified"]:
+            rank += 1
+            r["power_rank"] = rank
+        else:
+            r["power_rank"] = None
+    # qualified first (by rank), then unqualified by Power Index desc
+    rows.sort(key=lambda r: (r["power_rank"] is None,
+                             r["power_rank"] if r["power_rank"] is not None else -r["power_index"]))
     return rows
 ```
 
@@ -1387,7 +1414,7 @@ git commit -m "chore: placeholder dashboard + verified end-to-end build"
   - Tab render functions are registered in `RENDERERS = {overview: fn, ...}` and called on first activation.
 
 - [ ] **Step 1: Author the shell** — replace `dashboard/index.html` with a document containing:
-  1. `<head>`: meta viewport, `<title>Gridiron League History</title>`, Chart.js CDN `<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>`, and an inline `<style>` implementing the football theme (CSS variables for bg/surface/border/text/accent/green; header, nav tabs, cards, tables, pills, rank badges, chart wrappers, responsive `@media` at 900px).
+  1. `<head>`: meta viewport, `<title>Gridiron League History</title>`, Chart.js CDN `<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>`, and an inline `<style>` implementing the football theme (CSS variables for bg/surface/border/text/accent/green; header, nav tabs, cards, `.card-note` (small muted caption text), tables, pills, rank badges, chart wrappers, responsive `@media` at 900px).
   2. `<body>`: a `.header` (league title + headline stats: seasons, total games, all-time champ leader), a `.nav` with 6 buttons, six `<section class="tab">` panels (`tab-overview` active by default, others hidden), and the data script:
      `<script id="league-data" type="application/json">/*DATA_START*/{}/*DATA_END*/</script>`
   3. A final `<script>` with the shared helpers below.
@@ -1534,13 +1561,19 @@ RENDERERS.overview = function(){
 ```javascript
 RENDERERS.rankings = function(){
   const root=document.getElementById("tab-rankings"); root.innerHTML="";
-  const card=el("div",{class:"card"}, el("div",{class:"card-title"},"🏈 All-Time Standings (Regular Season)"));
+  const card=el("div",{class:"card"},
+    el("div",{class:"card-title"},"🏈 All-Time Standings (Regular Season)"),
+    el("div",{class:"card-note"},"Power Rank requires ≥ 40 games (~3 seasons); "+
+      "owners below that (historical short-timers) are shown unranked (—) at the bottom."));
   const wrap=el("div",{class:"table-scroll"}); card.append(wrap); root.append(card);
   const rows=DATA.all_time_standings.map(r=>({...r,
+     owner_label: isActive(r.owner) ? r.owner : r.owner + " (inactive)",
      titles:(DATA.owner_careers[r.owner]?.titles||[]).length}));
   renderTable(wrap,
-    [{key:"power_rank",label:"#"},{key:"owner",label:"Team"},
+    [{key:"power_rank",label:"#",fmt:v=>v==null?"—":v},
+     {key:"owner_label",label:"Team"},
      {key:"wins",label:"W"},{key:"losses",label:"L"},{key:"ties",label:"T"},
+     {key:"games",label:"G"},
      {key:"win_pct",label:"Win%",fmt:v=>(v*100).toFixed(1)+"%"},
      {key:"pf",label:"PF",fmt:v=>v.toFixed(0)},
      {key:"pa",label:"PA",fmt:v=>v.toFixed(0)},
@@ -1548,10 +1581,10 @@ RENDERERS.rankings = function(){
      {key:"power_index",label:"P-Idx",fmt:v=>v.toFixed(2)},
      {key:"titles",label:"🏆"}],
     rows);
-  const chartCard=el("div",{class:"card"}, el("div",{class:"card-title"},"Power Index"));
+  const chartCard=el("div",{class:"card"}, el("div",{class:"card-title"},"Power Index (all owners)"));
   const cw=el("div",{class:"chart-wrap"}); const canvas=el("canvas"); cw.append(canvas);
   chartCard.append(cw); root.append(chartCard);
-  const sorted=[...DATA.all_time_standings].sort((a,b)=>a.power_rank-b.power_rank);
+  const sorted=[...DATA.all_time_standings].sort((a,b)=>b.power_index-a.power_index);
   new Chart(canvas,{type:"bar",data:{labels:sorted.map(r=>r.owner),
     datasets:[{label:"Power Index",data:sorted.map(r=>r.power_index),
       backgroundColor:sorted.map(r=>OWNER_COLORS[r.owner])}]},
