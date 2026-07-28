@@ -618,6 +618,38 @@ RENDERERS.overview = function(){
     curRows);
 };
 
+RENDERERS.rankings = function(){
+  const root=document.getElementById("tab-rankings"); root.innerHTML="";
+  const card=el("div",{class:"card"},
+    el("div",{class:"card-title"},"🏈 All-Time Standings (Regular Season)"),
+    el("div",{class:"card-note"},"Power Rank requires ≥ 40 games (~3 seasons); "+
+      "owners below that (historical short-timers) are shown unranked (—) at the bottom."));
+  const wrap=el("div",{class:"table-scroll"}); card.append(wrap); root.append(card);
+  const rows=DATA.all_time_standings.map(r=>({...r,
+     owner_label: isActive(r.owner) ? r.owner : r.owner + " (inactive)",
+     titles:(DATA.owner_careers[r.owner]?.titles||[]).length}));
+  renderTable(wrap,
+    [{key:"power_rank",label:"#",fmt:v=>v==null?"—":v},
+     {key:"owner_label",label:"Team"},
+     {key:"wins",label:"W"},{key:"losses",label:"L"},{key:"ties",label:"T"},
+     {key:"games",label:"G"},
+     {key:"win_pct",label:"Win%",fmt:v=>(v*100).toFixed(1)+"%"},
+     {key:"pf",label:"PF",fmt:v=>v.toFixed(0)},
+     {key:"pa",label:"PA",fmt:v=>v.toFixed(0)},
+     {key:"avg_score",label:"Avg",fmt:v=>v.toFixed(1)},
+     {key:"power_index",label:"P-Idx",fmt:v=>v.toFixed(2)},
+     {key:"titles",label:"🏆"}],
+    rows);
+  const chartCard=el("div",{class:"card"}, el("div",{class:"card-title"},"Power Index (all owners)"));
+  const cw=el("div",{class:"chart-wrap"}); const canvas=el("canvas"); cw.append(canvas);
+  chartCard.append(cw); root.append(chartCard);
+  const sorted=[...DATA.all_time_standings].sort((a,b)=>b.power_index-a.power_index);
+  new Chart(canvas,{type:"bar",data:{labels:sorted.map(r=>r.owner),
+    datasets:[{label:"Power Index",data:sorted.map(r=>r.power_index),
+      backgroundColor:sorted.map(r=>OWNER_COLORS[r.owner])}]},
+    options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}});
+};
+
 // header stats + first tab
 window.addEventListener("DOMContentLoaded",()=>{ switchTab("overview"); });
 </script>
