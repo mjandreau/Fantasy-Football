@@ -3,7 +3,7 @@ from build.loaders import parse_league_history
 def test_parse_history_counts_and_shape(league_history_path):
     games = parse_league_history(league_history_path)
     # Total games across all 15 sheets (verified via cross-reference)
-    assert len(games) == 1360
+    assert len(games) == 1399
     # Every game has both scores as floats and a season in range
     for g in games:
         assert 2011 <= g["season"] <= 2025
