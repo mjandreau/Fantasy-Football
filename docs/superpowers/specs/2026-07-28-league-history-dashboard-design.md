@@ -29,6 +29,8 @@ data) served on GitHub Pages.
 - The dashboard is a single `index.html` that opens with no server and no live
   Excel dependency (all data embedded as JSON).
 - Faithful reproduction of the league's existing metrics (esp. Power Index).
+- **Complete, reconciled data** — every game, every season, with score conflicts
+  between the two source files surfaced and resolved.
 - A distinct, polished football visual identity.
 - Shareable via a free GitHub Pages URL.
 
@@ -39,46 +41,82 @@ data) served on GitHub Pages.
   (data exists; held in reserve for a later pass).
 - Any server-side/backend component or database.
 
-## Source data
+## Source data & the cross-reference finding
 
-Two Excel files (kept local in `data/`, gitignored):
+Two Excel files (kept local in `data/`, gitignored). A game-log cross-reference
+established their roles:
 
-### `The Gridiron.xlsx` (36 sheets — the analytical engine)
-- **`Data_Sorted`** — the canonical results table: **1,117 games across all 15
-  seasons**, normalized to consistent **owner names**. Columns: Season, Week,
-  Home Team (owner), Home Score, Away Team (owner), Away Score, Total Score,
-  Margin, Winner, Loser, Tie. This is the results spine.
-- **`Data`** — same rows, raw Google-Form input (timestamped). Redundant with
-  `Data_Sorted`; `Data_Sorted` is preferred.
-- **`Input`** — hand-entered championships and last-place finishes per owner.
-- **`All Time Stats` / `Current Season` / `Single Season Stats`** — computed
-  standings; source of the **Power Index formula** (read from formula cells).
-- **`Setup`** — owner roster (15 all-time owners incl. historical co-managers
-  Chris Borea, Joe Kosich, Tucker).
+### League Schedule History.xlsx — **PRIMARY source of truth**
+- 15 sheets, one per season 2011–2025. **1,360 games total.**
+- Contains **every game including playoffs** and the **fun team names** per
+  season (e.g. "MATTY BIG TRAPS"). Actively maintained and **complete through
+  2025** (regular season + Playoff Rounds 1–3).
+- Row layout: `AWAY TEAM (record) | Away Manager | Away Score | Home Score |
+  Home Manager | HOME TEAM (record)`.
+- Section headers delimit weeks: `NFL Week 1` … `NFL Week 14`, then
+  `Playoff Round 1 (NFL Week 15)`, `Playoff Round 2 (NFL Week 16)`,
+  `Playoff Round 3 (NFL Week 17)`. A `Bye:` block in Round 1 lists the two
+  top-seed bye teams and their bye-week points.
 
-### `League Schedule History.xlsx` (15 sheets, one per season 2011–2025)
-- Weekly matchup grids carrying the **fun team names** (e.g. "MATTY BIG TRAPS")
-  and W-L records — the flavor `Data_Sorted` lacks. Layout per row:
-  `AWAY TEAM (record) | Manager | Score || Score | Manager | HOME TEAM (record)`.
+### The Gridiron.xlsx — **SECONDARY (validation + formula + curated lists)**
+- `Data_Sorted` — **regular season only** (1,117 games, Weeks 1–14), normalized
+  to short **owner names**. **Stale: froze at Week 9 of 2025.** Used to validate
+  regular-season scores and to anchor the owner-name normalization.
+- `All Time Stats` — source of the **Power Index formula** (read from the cell
+  formula, not just values).
+- `Input` — hand-entered **champions** and **last-place finishes** per owner.
 
-### Owner roster
-12 active owners: Baker, Buffalo Joe, Devin, Joe Klim, Joe Ricci, Luke, Matt,
-Nolan, Pel, Reid (co-managed w/ Mike), Spark, Walter. Plus historical
-co-managers: Chris Borea, Joe Kosich, Tucker. League was 10 teams (2011–2014),
-expanded to 12 (2015+).
+### Why League History is primary
+Cross-reference results (game-level, matched by season + week + owner pair):
+- League History has every playoff game; Gridiron has none.
+- Gridiron froze at 2025 Week 9; League History has all of 2025.
+- Score disagreements (nearly all ~1 pt, consistent with ESPN stat
+  corrections): 2019 = 0, 2024 = 3, **2021 = 34**, **2023 = 22**, others 0–3.
+- **Resolution decision: League Schedule History wins all score conflicts.**
+  The build emits a reconciliation report listing every Gridiron disagreement
+  for spot-checking, but does not change values.
 
-### Confirmed champions (from `Input`)
-Walter '11/'12 · Matt '13/'15 · Luke '14 · Buffalo Joe '16/'22 ·
-Nolan '17/'19/'20/'21 · Baker '18 · Joe Ricci '24.
-**Gap:** 2023 champion & last-place are missing; 2025 is in progress.
+### Owner roster & name normalization
+12 active owners (short name ← manager string in League History):
+
+| Owner (short) | Manager string(s) in League History |
+|---|---|
+| Baker | Michael Baker |
+| Buffalo Joe | Joe Kaszubowski |
+| Devin | Devin Zeller |
+| Joe Klim | Joseph Klimczak |
+| Joe Ricci | joe ricci |
+| Luke | Luke Palma (2014: "Luke Palma, Michael Baker") |
+| Matt | Matt Jandreau |
+| Nolan | nolan villani (early yrs: "nolan villani, Tucker Bachand") |
+| Pel | Ryan Peloquin |
+| Reid | "Mike Paleologopoulos, Reid Roberge" / "Red Roberge" |
+| Spark | Spark Carpenter |
+| Walter | Walter Klimczak |
+
+Historical/co-manager tokens seen in Gridiron early years (Tucker Bachand,
+Joe Kosich, Dan/Chris Borea) map to their team's primary owner; the build
+reconciliation report flags any manager string that does not resolve. The
+"Klimczak" collision (Walter vs Joseph) is resolved on first name.
+League was 10 teams (2011–2014), expanded to 12 (2015+).
+
+### Champions & last place (curated list)
+Source: Gridiron `Input` + user corrections. Champions:
+Walter '11/'12 · Matt '13/'15 · Luke '14 · Buffalo Joe '16/'22/**'23** ·
+Nolan '17/'19/'20/'21 · Baker '18 · Joe Ricci '24 · **2025 = pending (Matt to
+provide)**.
+Last place: Luke '11 · Devin '12/'19/**'23** · Spark '13 · Reid '14/'18 ·
+Nolan '15 · Joe Klim '16 · Joe Ricci '17/'21 · Pel '20 · Baker '22 · Matt '24 ·
+**2025 = pending**.
 
 ## Architecture
 
 A **Python build step** produces a **self-contained dashboard**:
 
 ```
-data/*.xlsx  ──►  build/build_data.py  ──►  build/league_data.json
-                                        └─►  dashboard/index.html (data embedded)
+data/*.xlsx  ──►  build/build_data.py  ──►  build/league_data.json   (clean data)
+                                        ├─►  build/reconciliation.md  (QA report)
+                                        └─►  dashboard/index.html     (data embedded)
 ```
 
 Rationale: repeatable every season (drop in new data, re-run, redeploy) and the
@@ -97,7 +135,8 @@ Fantasy-Football/
 │  └─ League Schedule History.xlsx
 ├─ build/
 │  ├─ build_data.py       # xlsx → clean games + computed stats → JSON + HTML
-│  └─ league_data.json    # generated intermediate ("the cleaned data")
+│  ├─ league_data.json    # generated: the cleaned dataset
+│  └─ reconciliation.md   # generated: QA report of source discrepancies
 ├─ docs/
 │  └─ superpowers/specs/  # this spec and future specs
 ├─ .gitignore             # excludes data/*.xlsx
@@ -106,37 +145,43 @@ Fantasy-Football/
 
 ## Data model — the tidy games table
 
-`build_data.py` emits one canonical **games** table, one row per game:
+`build_data.py` parses **League History** into one canonical **games** table,
+one row per game:
 
 | field | source |
 |-------|--------|
-| `season` | Data_Sorted |
-| `week` | Data_Sorted |
-| `is_playoff` | inferred (see Open Items) |
-| `home_owner`, `away_owner` | Data_Sorted |
-| `home_team_name`, `away_team_name` | joined from League Schedule History (by owner+season+score) |
-| `home_score`, `away_score` | Data_Sorted |
-| `winner`, `loser`, `margin`, `tie` | Data_Sorted / derived |
+| `season` | sheet name |
+| `week` | section header (1–14 regular; 15–17 playoff rounds) |
+| `phase` | `regular` or `playoff` (from section label) |
+| `playoff_round` | 1/2/3 when playoff, else null |
+| `home_owner`, `away_owner` | manager string → normalized owner |
+| `home_team_name`, `away_team_name` | team-name text (record stripped) |
+| `home_score`, `away_score` | League History scores (authoritative) |
+| `winner`, `loser`, `margin`, `tie` | derived |
+| `gridiron_conflict` | true if Gridiron had a differing score (for QA report) |
 
-All downstream stats are **computed** from this table — never hand-copied.
-Champions/last-place come from `Input` (a small curated overlay keyed by
-owner+season).
+Team name per owner per season = the final/most-frequent team name in that
+season's sheet (records in parentheses are stripped). Champions/last-place are a
+small curated overlay keyed by season.
 
 ## Computed metrics
 
-- **Standings** (all-time and per-season): Wins, Losses, Win%, Points For,
-  Points Against, Average Score, Streak, Games.
+All computed from the games table. **Standings & Power Index use `phase =
+regular` games only** (matching the league's existing figures); playoff games
+feed champions, record book, and playoff history.
+
+- **Standings** (all-time and per-season, regular season): Wins, Losses, Win%,
+  Points For, Points Against, Average Score, Streak, Games.
 - **Power Index** (exact league formula, reproduced):
   `PI = ((AvgScore / league_avg(AvgScore)) * 80 + Win% * 100) * (1/7)`
-  where `AvgScore = PointsFor / Games`, and `league_avg(AvgScore)` is the mean
-  of per-owner average scores in that scope (season or all-time).
-- **Power Rank** = rank of Power Index within scope.
+  where `AvgScore = PointsFor / Games` and `league_avg(AvgScore)` is the mean of
+  per-owner average scores in scope. **Power Rank** = rank of PI within scope.
 - **Head-to-head**: full pairwise matrix (record, avg scores, biggest wins,
-  meeting history) for every owner pairing.
+  meeting history), with regular-season and playoff meetings distinguished.
 - **Record book**: highest/lowest single-team scores, biggest margins, closest
-  games, highest combined scores, ties log.
-- **Owner careers**: titles, last-place finishes, per-season finish, best/worst
-  seasons and games, top rivalries.
+  games, highest combined scores, ties log (regular + playoff, labeled).
+- **Owner careers**: titles, last-place finishes, per-season finish, playoff
+  appearances, best/worst seasons and games, top rivalries.
 
 ## Dashboard — six tabs
 
@@ -145,7 +190,7 @@ owner+season).
 2. **All-Time Rankings** — sortable all-time standings with Power Index/Rank;
    career leaderboards.
 3. **Season-by-Season** — year selector (2011–2025): that season's standings,
-   champion, fun team names, and weekly results.
+   champion, fun team names, weekly results, and playoff bracket/results.
 4. **Head-to-Head** — pick two owners → rivalry record, averages, biggest wins,
    full meeting history (interactive version of the Gridiron H2H engine).
 5. **Record Book** — all-time highs/lows, blowouts, nail-biters, ties.
@@ -165,20 +210,22 @@ resemblance to the baseball dashboard's structure without copying its palette.
 Push the repo to `github.com/mjandreau/Fantasy-Football`; enable **GitHub Pages**
 (serving `dashboard/` or root `index.html`) for a free shareable link. Source
 `.xlsx` files stay local via `.gitignore`; the dashboard works standalone
-because its data is embedded.
+because its data is embedded. (Before first push, optionally reset the local git
+identity from the work email to Matt's personal email.)
 
 ## Open items (resolved during build)
 
-1. **2023 champion & last-place** — missing from `Input`; Matt to provide, or
-   derive from playoff results if identifiable.
-2. **Playoffs vs regular season** — the games table includes playoff weeks;
-   infer/mark `is_playoff` so standings can separate regular-season record from
-   playoff results (needed to correctly attribute champions). Heuristic:
-   regular-season week count varies by era (13–14 weeks); confirm the playoff
-   start week per season against the schedule history.
-3. **Team-name join** — matching fun team names to owners relies on
-   owner+season+score; verify no ambiguous matches (e.g., identical scores in a
-   week) and fall back to manager name where needed.
+1. **2025 champion & last place** — Matt to provide; complete the curated list.
+2. **Reconciliation report review** — after first build, Matt spot-checks the
+   ~60 flagged score conflicts (mostly 2021 & 2023); League History values stand
+   unless he says otherwise.
+3. **Playoff bracket derivation** — Round 1–3 sheets include all 12 teams
+   (championship + placement brackets in parallel) plus a `Bye:` block. Champions
+   come from the curated list, not fragile auto-derivation; the Season tab shows
+   playoff-round results as recorded. Full bracket reconstruction (seeding →
+   final) is best-effort/optional.
+4. **Regular-season length varies by era** (13–14 weeks). `phase` is taken from
+   the explicit `Playoff Round` labels, so this needs no per-season hardcoding.
 
 ## Future phases (out of scope now)
 
