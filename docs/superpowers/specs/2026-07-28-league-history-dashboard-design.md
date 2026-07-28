@@ -102,12 +102,11 @@ League was 10 teams (2011–2014), expanded to 12 (2015+).
 
 ### Champions & last place (curated list)
 Source: Gridiron `Input` + user corrections. Champions:
-Walter '11/'12 · Matt '13/'15 · Luke '14 · Buffalo Joe '16/'22/**'23** ·
-Nolan '17/'19/'20/'21 · Baker '18 · Joe Ricci '24 · **2025 = pending (Matt to
-provide)**.
-Last place: Luke '11 · Devin '12/'19/**'23** · Spark '13 · Reid '14/'18 ·
-Nolan '15 · Joe Klim '16 · Joe Ricci '17/'21 · Pel '20 · Baker '22 · Matt '24 ·
-**2025 = pending**.
+Walter '11/'12/**'25** · Matt '13/'15 · Luke '14 · Buffalo Joe '16/'22/**'23** ·
+Nolan '17/'19/'20/'21 · Baker '18 · Joe Ricci '24.
+Last place: Luke '11 · Devin '12/'19/**'23**/**'25** · Spark '13 · Reid '14/'18 ·
+Nolan '15 · Joe Klim '16 · Joe Ricci '17/'21 · Pel '20 · Baker '22 · Matt '24.
+All 15 seasons now have a recorded champion and last place.
 
 ## Architecture
 
@@ -215,16 +214,15 @@ identity from the work email to Matt's personal email.)
 
 ## Open items (resolved during build)
 
-1. **2025 champion & last place** — Matt to provide; complete the curated list.
-2. **Reconciliation report review** — after first build, Matt spot-checks the
+1. **Reconciliation report review** — after first build, Matt spot-checks the
    ~60 flagged score conflicts (mostly 2021 & 2023); League History values stand
    unless he says otherwise.
-3. **Playoff bracket derivation** — Round 1–3 sheets include all 12 teams
+2. **Playoff bracket derivation** — Round 1–3 sheets include all 12 teams
    (championship + placement brackets in parallel) plus a `Bye:` block. Champions
    come from the curated list, not fragile auto-derivation; the Season tab shows
    playoff-round results as recorded. Full bracket reconstruction (seeding →
    final) is best-effort/optional.
-4. **Regular-season length varies by era** (13–14 weeks). `phase` is taken from
+3. **Regular-season length varies by era** (13–14 weeks). `phase` is taken from
    the explicit `Playoff Round` labels, so this needs no per-season hardcoding.
 
 ## Future phases (out of scope now)
