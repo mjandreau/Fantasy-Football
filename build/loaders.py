@@ -55,3 +55,25 @@ def parse_league_history(path):
                 })
     wb.close()
     return games
+
+
+def parse_gridiron(path):
+    """Read Data_Sorted into {(season, week, frozenset(owners)): {owner: score}}."""
+    wb = openpyxl.load_workbook(path, data_only=True)
+    ws = wb["Data_Sorted"]
+    out = {}
+    for row in ws.iter_rows(min_row=2, values_only=True):
+        # cols: A blank, B season, C week, D home, E home_score, F away, G away_score
+        season, week, home, hs, away, as_ = row[1], row[2], row[3], row[4], row[5], row[6]
+        if not (_isnum(season) and _isnum(hs) and _isnum(as_)):
+            continue
+        if not home or not away:
+            continue
+        season = int(float(season))
+        wk = int(float(week)) if _isnum(week) else week
+        out[(season, wk, frozenset({home, away}))] = {
+            home: round(float(hs), 1),
+            away: round(float(as_), 1),
+        }
+    wb.close()
+    return out
