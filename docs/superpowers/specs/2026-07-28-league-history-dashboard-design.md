@@ -47,7 +47,7 @@ Two Excel files (kept local in `data/`, gitignored). A game-log cross-reference
 established their roles:
 
 ### League Schedule History.xlsx — **PRIMARY source of truth**
-- 15 sheets, one per season 2011–2025. **1,360 games total.**
+- 15 sheets, one per season 2011–2025. **1,399 games total.**
 - Contains **every game including playoffs** and the **fun team names** per
   season (e.g. "MATTY BIG TRAPS"). Actively maintained and **complete through
   2025** (regular season + Playoff Rounds 1–3).
@@ -94,11 +94,16 @@ Cross-reference results (game-level, matched by season + week + owner pair):
 | Spark | Spark Carpenter |
 | Walter | Walter Klimczak |
 
-Historical/co-manager tokens seen in Gridiron early years (Tucker Bachand,
-Joe Kosich, Dan/Chris Borea) map to their team's primary owner; the build
-reconciliation report flags any manager string that does not resolve. The
-"Klimczak" collision (Walter vs Joseph) is resolved on first name.
-League was 10 teams (2011–2014), expanded to 12 (2015+).
+The "Klimczak" collision (Walter vs Joseph) is resolved on first name.
+
+**Historical owners.** League was 10 teams (2011–2014), expanded to 12 (2015+).
+Three managers played only the 10-team era and then left: **Chris Borea**
+(recorded as "Dan Borea" in the schedule — same person), **Joe Kosich**, and
+**Tucker**. They are kept as first-class **historical owners** (15 all-time = 12
+active + 3 historical) so 2011–2014 history is complete and standings for those
+seasons show the true 10 teams. UI marks historical owners inactive via
+`meta.active_owners`. Co-managed early teams (e.g. "nolan villani, joe kosich")
+resolve to the first-listed manager.
 
 ### Champions & last place (curated list)
 Source: Gridiron `Input` + user corrections. Champions:

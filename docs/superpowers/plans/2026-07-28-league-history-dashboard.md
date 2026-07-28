@@ -14,6 +14,7 @@
 - **Standings & Power Index use regular-season games only** (`phase == "regular"`, Weeks 1–14). Playoffs feed champions, record book, and H2H history — never regular-season standings.
 - **Power Index formula (exact):** `PI = ((AvgScore / league_avg(AvgScore)) * 80 + Win% * 100) * (1/7)`, where `AvgScore = PointsFor / Games` and `league_avg(AvgScore)` = mean of per-owner average scores in scope (season or all-time). `PowerRank` = descending rank of PI within scope.
 - **12 active owners** (short names): Baker, Buffalo Joe, Devin, Joe Klim, Joe Ricci, Luke, Matt, Nolan, Pel, Reid, Spark, Walter.
+- **3 historical owners** (played only the 2011–2014 10-team era, then left): Chris Borea, Joe Kosich, Tucker. **15 all-time owners** total. Standings/records/H2H/careers include all 15; UI flags historical owners as inactive (via `meta.active_owners`). Early seasons (2011–2014) correctly show 10 teams. "Dan Borea" (schedule) and "Chris Borea" (Gridiron) are the same person → displayed as **Chris Borea**.
 - **Source `.xlsx` files stay local** (gitignored). The dashboard must work standalone with data embedded.
 - **Python interpreter:** use the environment where `openpyxl`/`pytest` are installed. Commands below use `python`/`pytest`; if not on PATH, prefix with the anaconda env python.
 - **Champions (curated, authoritative):** 2011 Walter, 2012 Walter, 2013 Matt, 2014 Luke, 2015 Matt, 2016 Buffalo Joe, 2017 Nolan, 2018 Baker, 2019 Nolan, 2020 Nolan, 2021 Nolan, 2022 Buffalo Joe, 2023 Buffalo Joe, 2024 Joe Ricci, 2025 Walter.
@@ -23,7 +24,7 @@
 
 ```json
 {
-  "meta": {"seasons": [2011, "...", 2025], "owners": ["Baker", "..."], "total_games": 1360, "generated": "2026-07-28"},
+  "meta": {"seasons": [2011, "...", 2025], "owners": ["Baker", "...15 all-time..."], "active_owners": ["Baker", "...12 active..."], "total_games": 1399, "generated": "2026-07-28"},
   "games": [{"season": 2025, "week": 1, "phase": "regular", "playoff_round": null,
              "home_owner": "Walter", "home_team": "Herbie Fully Loaded", "home_score": 152.8,
              "away_owner": "Buffalo Joe", "away_team": "Fields and Streams", "away_score": 212.6,
@@ -172,7 +173,7 @@ from build.loaders import parse_league_history
 def test_parse_history_counts_and_shape(league_history_path):
     games = parse_league_history(league_history_path)
     # Total games across all 15 sheets (verified via cross-reference)
-    assert len(games) == 1360
+    assert len(games) == 1399
     # Every game has both scores as floats and a season in range
     for g in games:
         assert 2011 <= g["season"] <= 2025
@@ -322,9 +323,19 @@ def test_clean_team_name():
     assert clean_team_name("CEEDEE's NUTZ!?(8-6-0)") == "CEEDEE's NUTZ!?"
     assert clean_team_name("Plain Name") == "Plain Name"
 
-def test_owners_list():
-    assert len(OWNERS) == 12
-    assert "Buffalo Joe" in OWNERS and "Joe Klim" in OWNERS
+def test_owner_mapping_historical():
+    assert owner_from_manager("Tucker Bachand") == "Tucker"
+    assert owner_from_manager("joe kosich") == "Joe Kosich"
+    assert owner_from_manager("Dan Borea") == "Chris Borea"
+    assert owner_from_manager("Chris Borea") == "Chris Borea"
+    # co-managed early team resolves to the first-listed owner
+    assert owner_from_manager("nolan villani, joe kosich") == "Nolan"
+
+def test_owner_lists():
+    from build.normalize import ACTIVE_OWNERS, HISTORICAL_OWNERS, ALL_TIME_OWNERS
+    assert len(OWNERS) == 12 and OWNERS is ACTIVE_OWNERS
+    assert set(HISTORICAL_OWNERS) == {"Chris Borea", "Joe Kosich", "Tucker"}
+    assert len(ALL_TIME_OWNERS) == 15
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
@@ -337,11 +348,15 @@ Expected: FAIL — module/functions undefined.
 ```python
 import re
 
-OWNERS = ["Baker", "Buffalo Joe", "Devin", "Joe Klim", "Joe Ricci", "Luke",
-          "Matt", "Nolan", "Pel", "Reid", "Spark", "Walter"]
+ACTIVE_OWNERS = ["Baker", "Buffalo Joe", "Devin", "Joe Klim", "Joe Ricci", "Luke",
+                 "Matt", "Nolan", "Pel", "Reid", "Spark", "Walter"]
+# Departed after the 2015 expansion (played only the 2011-2014 10-team era):
+HISTORICAL_OWNERS = ["Chris Borea", "Joe Kosich", "Tucker"]
+ALL_TIME_OWNERS = ACTIVE_OWNERS + HISTORICAL_OWNERS
+OWNERS = ACTIVE_OWNERS  # backward-compatible alias: the 12 active owners
 
 # Ordered rules: first substring that matches the FIRST listed manager wins.
-# Order matters — more specific keys first (e.g. "joseph klim" before "klim").
+# Order matters — more specific keys first (e.g. "joseph klim" before "walter").
 _RULES = [
     ("kaszubowski", "Buffalo Joe"),
     ("joseph klim", "Joe Klim"),
@@ -356,6 +371,10 @@ _RULES = [
     ("peloquin", "Pel"),
     ("roberge", "Reid"),
     ("paleologopoulos", "Reid"),
+    # Historical (2011-2014) owners who later left the league:
+    ("kosich", "Joe Kosich"),
+    ("bachand", "Tucker"),
+    ("borea", "Chris Borea"),  # both "Dan Borea" (schedule) and "Chris Borea" (Gridiron)
 ]
 
 _RECORD_RE = re.compile(r"\s*\((\d+\s*-\s*\d+(?:\s*-\s*\d+)?)\)\s*$")
@@ -413,7 +432,7 @@ from build.games import build_games, season_team_names
 
 def test_build_games_shape_and_counts(league_history_path):
     games = build_games(league_history_path)
-    assert len(games) == 1360
+    assert len(games) == 1399
     g = games[0]
     for k in ("season", "week", "phase", "home_owner", "away_owner",
               "home_team", "away_team", "home_score", "away_score",
@@ -432,13 +451,19 @@ def test_build_games_winner_and_margin(league_history_path):
     assert m["tie"] is False
 
 def test_build_games_no_unknown_owners(league_history_path):
-    # Every game resolves to two of the 12 owners (post-2015 12-team era at minimum)
+    # Every game (all 15 seasons) resolves to a known all-time owner.
+    from build.normalize import ALL_TIME_OWNERS
     games = build_games(league_history_path)
-    modern = [g for g in games if g["season"] >= 2015]
-    from build.normalize import OWNERS
-    for g in modern:
-        assert g["home_owner"] in OWNERS
-        assert g["away_owner"] in OWNERS
+    for g in games:
+        assert g["home_owner"] in ALL_TIME_OWNERS
+        assert g["away_owner"] in ALL_TIME_OWNERS
+
+def test_build_games_historical_owners_in_early_seasons(league_history_path):
+    # The 3 departed owners appear in the 2011-2014 (10-team) era.
+    games = build_games(league_history_path)
+    early = {g["home_owner"] for g in games if g["season"] <= 2014} | \
+            {g["away_owner"] for g in games if g["season"] <= 2014}
+    assert {"Chris Borea", "Joe Kosich", "Tucker"} <= early
 
 def test_season_team_names(league_history_path):
     games = build_games(league_history_path)
@@ -501,7 +526,7 @@ def season_team_names(games):
 - [ ] **Step 4: Run tests to verify they pass**
 
 Run: `pytest tests/test_games.py -q`
-Expected: 4 passed. (If `test_build_games_no_unknown_owners` fails on a pre-2015 co-manager string, extend `_RULES` in `build/normalize.py` to cover it, e.g. add `("kosich", "Nolan")`, `("borea", "Reid")`, `("tucker", "Nolan")` — verify against the actual sheet before choosing the mapping — and re-run.)
+Expected: 5 passed. (The 3 historical owners — Chris Borea, Joe Kosich, Tucker — are already covered by `_RULES` from Task 3, so all seasons resolve. Co-managed early teams like "nolan villani, joe kosich" resolve to the first-listed owner, Nolan.)
 
 - [ ] **Step 5: Commit**
 
@@ -792,14 +817,20 @@ from build.metrics import standings
 
 def test_all_time_standings_structure(league_history_path):
     rows = build_and_stand(league_history_path)
-    assert len(rows) == 12
+    # 15 all-time owners: 12 active + 3 historical (2011-2014)
+    assert len(rows) == 15
     top = rows[0]
     for k in ("owner", "wins", "losses", "ties", "win_pct", "pf", "pa",
               "games", "avg_score", "power_index", "power_rank"):
         assert k in top
     assert top["power_rank"] == 1
-    # ranks are 1..12 unique
-    assert sorted(r["power_rank"] for r in rows) == list(range(1, 13))
+    # ranks are 1..15 unique
+    assert sorted(r["power_rank"] for r in rows) == list(range(1, 16))
+
+def test_early_season_has_ten_teams(league_history_path):
+    from build.games import build_games
+    rows = standings(build_games(league_history_path), season=2011)
+    assert len(rows) == 10  # 10-team era
 
 def test_standings_regular_season_only(league_history_path):
     games = build_games(league_history_path)
@@ -1099,9 +1130,10 @@ def test_assemble_top_level_keys(league_history_path, gridiron_path):
     for k in ("meta", "games", "champions", "team_names", "all_time_standings",
               "season_standings", "head_to_head", "record_book", "owner_careers"):
         assert k in data
-    assert data["meta"]["total_games"] == 1360
+    assert data["meta"]["total_games"] == 1399
     assert data["meta"]["seasons"] == list(range(2011, 2026))
-    assert len(data["all_time_standings"]) == 12
+    assert len(data["all_time_standings"]) == 15
+    assert len(data["meta"]["active_owners"]) == 12
     assert set(data["season_standings"].keys()) == {str(y) for y in range(2011, 2026)}
     assert report.startswith("#")
 
@@ -1124,11 +1156,11 @@ from build.loaders import parse_gridiron
 from build.reconcile import flag_conflicts, reconciliation_report
 from build.metrics import standings, head_to_head, record_book, owner_careers
 from build.curated import CHAMPIONS, validate_curated
-from build.normalize import OWNERS
+from build.normalize import ALL_TIME_OWNERS, ACTIVE_OWNERS
 
 
 def assemble(history_path, gridiron_path, generated):
-    validate_curated(OWNERS)
+    validate_curated(ALL_TIME_OWNERS)
     games = build_games(history_path)
     grid = parse_gridiron(gridiron_path)
     games = flag_conflicts(games, grid)
@@ -1136,7 +1168,8 @@ def assemble(history_path, gridiron_path, generated):
 
     seasons = sorted({g["season"] for g in games})
     data = {
-        "meta": {"seasons": seasons, "owners": OWNERS,
+        "meta": {"seasons": seasons, "owners": ALL_TIME_OWNERS,
+                 "active_owners": ACTIVE_OWNERS,
                  "total_games": len(games), "generated": generated},
         "games": games,
         "champions": CHAMPIONS,
@@ -1294,7 +1327,7 @@ Create `dashboard/index.html` with just:
 - [ ] **Step 3: Run the build**
 
 Run: `python -m build.build_data`
-Expected: prints "Injected data into ..." and "Wrote league_data.json (1360 games) and reconciliation.md". `build/league_data.json` and `build/reconciliation.md` now exist.
+Expected: prints "Injected data into ..." and "Wrote league_data.json (1399 games) and reconciliation.md". `build/league_data.json` and `build/reconciliation.md` now exist.
 
 - [ ] **Step 4: Eyeball the reconciliation report**
 
@@ -1339,9 +1372,12 @@ git commit -m "chore: placeholder dashboard + verified end-to-end build"
 ```html
 <script>
 const DATA = JSON.parse(document.getElementById('league-data').textContent);
-const OWNERS = DATA.meta.owners;
+const OWNERS = DATA.meta.owners;                    // 15 all-time
+const ACTIVE_OWNERS = DATA.meta.active_owners;      // 12 active
+const isActive = o => ACTIVE_OWNERS.includes(o);
 const PALETTE = ["#3fb950","#58a6ff","#f0b429","#bb86fc","#f85149","#39d353",
-                 "#ff7b72","#79c0ff","#d29922","#a5d6ff","#ffa657","#7ee787"];
+                 "#ff7b72","#79c0ff","#d29922","#a5d6ff","#ffa657","#7ee787",
+                 "#e3b341","#ff9bce","#56d4dd"];   // >=15 for all-time owners
 const OWNER_COLORS = Object.fromEntries(OWNERS.map((o,i)=>[o, PALETTE[i%PALETTE.length]]));
 
 function el(tag, attrs={}, ...kids){
