@@ -1,10 +1,14 @@
 import re
 
-OWNERS = ["Baker", "Buffalo Joe", "Devin", "Joe Klim", "Joe Ricci", "Luke",
-          "Matt", "Nolan", "Pel", "Reid", "Spark", "Walter"]
+ACTIVE_OWNERS = ["Baker", "Buffalo Joe", "Devin", "Joe Klim", "Joe Ricci", "Luke",
+                 "Matt", "Nolan", "Pel", "Reid", "Spark", "Walter"]
+# Departed after the 2015 expansion (played only the 2011-2014 10-team era):
+HISTORICAL_OWNERS = ["Chris Borea", "Joe Kosich", "Tucker"]
+ALL_TIME_OWNERS = ACTIVE_OWNERS + HISTORICAL_OWNERS
+OWNERS = ACTIVE_OWNERS  # backward-compatible alias: the 12 active owners
 
 # Ordered rules: first substring that matches the FIRST listed manager wins.
-# Order matters — more specific keys first (e.g. "joseph klim" before "klim").
+# Order matters — more specific keys first (e.g. "joseph klim" before "walter").
 _RULES = [
     ("kaszubowski", "Buffalo Joe"),
     ("joseph klim", "Joe Klim"),
@@ -19,6 +23,10 @@ _RULES = [
     ("peloquin", "Pel"),
     ("roberge", "Reid"),
     ("paleologopoulos", "Reid"),
+    # Historical (2011-2014) owners who later left the league:
+    ("kosich", "Joe Kosich"),
+    ("bachand", "Tucker"),
+    ("borea", "Chris Borea"),  # both "Dan Borea" (schedule) and "Chris Borea" (Gridiron)
 ]
 
 _RECORD_RE = re.compile(r"\s*\((\d+\s*-\s*\d+(?:\s*-\s*\d+)?)\)\s*$")

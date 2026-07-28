@@ -26,3 +26,17 @@ def test_clean_team_name():
 def test_owners_list():
     assert len(OWNERS) == 12
     assert "Buffalo Joe" in OWNERS and "Joe Klim" in OWNERS
+
+def test_owner_mapping_historical():
+    assert owner_from_manager("Tucker Bachand") == "Tucker"
+    assert owner_from_manager("joe kosich") == "Joe Kosich"
+    assert owner_from_manager("Dan Borea") == "Chris Borea"
+    assert owner_from_manager("Chris Borea") == "Chris Borea"
+    # co-managed early team resolves to the first-listed owner
+    assert owner_from_manager("nolan villani, joe kosich") == "Nolan"
+
+def test_owner_lists():
+    from build.normalize import ACTIVE_OWNERS, HISTORICAL_OWNERS, ALL_TIME_OWNERS
+    assert len(OWNERS) == 12 and OWNERS is ACTIVE_OWNERS
+    assert set(HISTORICAL_OWNERS) == {"Chris Borea", "Joe Kosich", "Tucker"}
+    assert len(ALL_TIME_OWNERS) == 15
