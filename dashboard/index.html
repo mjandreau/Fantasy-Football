@@ -262,6 +262,56 @@
     color:var(--text-dim);
   }
 
+  .card-title{
+    font-family:var(--font-display);
+    font-size:0.95rem;
+    text-transform:uppercase;
+    letter-spacing:0.03em;
+    margin-bottom:0.75rem;
+    color:var(--text);
+  }
+
+  .grid2{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:1rem;
+    margin-top:1rem;
+  }
+  @media (max-width:900px){ .grid2{ grid-template-columns:1fr; } }
+
+  .table-scroll{ overflow-x:auto; }
+
+  .champ-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fill, minmax(110px, 1fr));
+    gap:0.6rem;
+  }
+  .champ-card{
+    background:var(--surface-2);
+    border:1px solid var(--border-strong);
+    border-radius:var(--radius-sm);
+    padding:0.6rem 0.7rem;
+    text-align:center;
+  }
+  .champ-year{
+    font-family:var(--font-display);
+    font-size:0.78rem;
+    letter-spacing:0.05em;
+    color:var(--accent);
+  }
+  .champ-owner{
+    font-weight:600;
+    margin-top:0.15rem;
+  }
+  .champ-team{
+    font-size:0.72rem;
+    color:var(--text-dim);
+    margin-top:0.1rem;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+
   /* ---------- Tables ---------- */
   .table-wrap{ overflow-x:auto; border:1px solid var(--border); border-radius:var(--radius); }
   table.data-table{
@@ -422,7 +472,6 @@
       <span class="tab-kicker">01</span>
       <h2>Overview</h2>
     </div>
-    <p class="card-note">League-wide snapshot &mdash; standings, streaks, and headline trends land here.</p>
   </section>
 
   <section class="tab" id="tab-rankings">
@@ -531,6 +580,44 @@ function switchTab(name){
   if(!rendered.has(name) && RENDERERS[name]){ RENDERERS[name](); rendered.add(name); }
 }
 document.querySelectorAll(".nav-btn").forEach(b=>b.addEventListener("click",()=>switchTab(b.dataset.tab)));
+
+RENDERERS.overview = function(){
+  const root=document.getElementById("tab-overview");
+  root.innerHTML="";
+  // Championship banner
+  const champCard=el("div",{class:"card"}, el("div",{class:"card-title"},"🏆 Champions by Year"));
+  const champGrid=el("div",{class:"champ-grid"});
+  Object.keys(DATA.champions).sort().reverse().forEach(y=>{
+    const c=DATA.champions[y].champion;
+    const team=(DATA.team_names[y]||{})[c]||"";
+    champGrid.append(el("div",{class:"champ-card"},
+      el("div",{class:"champ-year"},y),
+      el("div",{class:"champ-owner"},c),
+      el("div",{class:"champ-team"},team)));
+  });
+  champCard.append(champGrid); root.append(champCard);
+
+  // All-time leaders (titles)
+  const titleCounts={};
+  Object.values(DATA.champions).forEach(r=>titleCounts[r.champion]=(titleCounts[r.champion]||0)+1);
+  const leaders=Object.entries(titleCounts).sort((a,b)=>b[1]-a[1]);
+  const leadCard=el("div",{class:"card"}, el("div",{class:"card-title"},"👑 Most Titles"));
+  leaders.forEach(([o,n])=>leadCard.append(el("div",{},`${o}: ${n}`)));
+  // Current season snapshot
+  const cur=DATA.meta.seasons[DATA.meta.seasons.length-1];
+  const curRows=DATA.season_standings[String(cur)];
+  const curCard=el("div",{class:"card"}, el("div",{class:"card-title"},`📅 ${cur} Standings`));
+  const curWrap=el("div",{class:"table-scroll"}); curCard.append(curWrap);
+  const grid2=el("div",{class:"grid2"}, leadCard, curCard);
+  root.append(grid2);
+  renderTable(curWrap,
+    [{key:"power_rank",label:"#"},{key:"owner",label:"Team"},
+     {key:"wins",label:"W"},{key:"losses",label:"L"},
+     {key:"avg_score",label:"Avg",fmt:v=>v.toFixed(1)},
+     {key:"power_index",label:"P-Idx",fmt:v=>v.toFixed(2)}],
+    curRows);
+};
+
 // header stats + first tab
 window.addEventListener("DOMContentLoaded",()=>{ switchTab("overview"); });
 </script>
