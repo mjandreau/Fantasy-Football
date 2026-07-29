@@ -9,6 +9,10 @@ def inject_into_dashboard(data, html_path):
     if not _MARKER_RE.search(text):
         raise ValueError("data markers /*DATA_START*/.../*DATA_END*/ not found in dashboard")
     payload = json.dumps(data, separators=(",", ":"))
+    # Guard against a future team/owner name containing "</script>" (or any
+    # "</...") breaking out of the embedded <script> tag. JSON parsers read
+    # "<\/" identically to "</", so this is a lossless, parse-safe escape.
+    payload = payload.replace("</", "<\\/")
     replacement = f"/*DATA_START*/{payload}/*DATA_END*/"
     text = _MARKER_RE.sub(lambda _m: replacement, text, count=1)
     html_path.write_text(text, encoding="utf-8")

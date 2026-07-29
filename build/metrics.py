@@ -8,7 +8,7 @@ def _regular(games, season=None):
 
 def _accumulate(games):
     acc = defaultdict(lambda: {"wins": 0, "losses": 0, "ties": 0, "pf": 0.0,
-                               "pa": 0.0, "games": 0, "results": []})
+                               "pa": 0.0, "games": 0})
     for g in games:
         for owner, own, opp in ((g["home_owner"], g["home_score"], g["away_score"]),
                                 (g["away_owner"], g["away_score"], g["home_score"])):
@@ -18,13 +18,10 @@ def _accumulate(games):
             a["games"] += 1
             if g["tie"]:
                 a["ties"] += 1
-                a["results"].append("T")
             elif own > opp:
                 a["wins"] += 1
-                a["results"].append("W")
             else:
                 a["losses"] += 1
-                a["results"].append("L")
     return acc
 
 
@@ -164,11 +161,7 @@ def owner_careers(games, champions):
                 continue
             season_rows.append({"season": season, "rank": r["power_rank"],
                                 "wins": r["wins"], "losses": r["losses"],
-                                "avg_score": r["avg_score"],
-                                "made_playoffs": any(
-                                    x["season"] == season and x["phase"] == "playoff"
-                                    and owner in (x["home_owner"], x["away_owner"])
-                                    for x in games)})
+                                "avg_score": r["avg_score"]})
         rivals = rival_losses[owner]
         top_rival = max(rivals, key=rivals.get) if rivals else None
         careers[owner] = {"titles": sorted(titles[owner]),

@@ -13,7 +13,9 @@ straight there.
 - **`dashboard/index.html`** — the league history dashboard. Fully
   self-contained: all league data is embedded directly in the HTML (as a JSON
   blob), so the file can be opened locally in a browser or hosted as a static
-  file with no server, build step, or external requests required. Six tabs:
+  file with no server or build step required. The only external requests are
+  the Chart.js library and web fonts loaded from public CDNs, both with
+  graceful fallbacks. Six tabs:
   - **Overview** — league-wide header stats and headline numbers
   - **All-Time Rankings** — Power Index and career leaderboards across all
     owners who meet the games-played qualifier
