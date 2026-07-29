@@ -745,6 +745,35 @@ RENDERERS.h2h = function(){
   a.addEventListener("change",draw); b.addEventListener("change",draw); draw();
 };
 
+RENDERERS.records = function(){
+  const root=document.getElementById("tab-records"); root.innerHTML="";
+  const section=(title, rows, cols)=>{
+    const card=el("div",{class:"card"}, el("div",{class:"card-title"},title));
+    const wrap=el("div",{class:"table-scroll"}); card.append(wrap); root.append(card);
+    renderTable(wrap, cols, rows);
+  };
+  const wk=r=>`${r.season} Wk${r.week}${r.phase==="playoff"?" (PO)":""}`;
+  section("🔥 Highest Scores", DATA.record_book.highest_scores,
+    [{key:"owner",label:"Team"},{key:"score",label:"Score",fmt:v=>v.toFixed(1)},
+     {key:"opponent",label:"vs"},{key:"season",label:"When",fmt:(_ ,r)=>wk(r)}]);
+  section("🧊 Lowest Scores", DATA.record_book.lowest_scores,
+    [{key:"owner",label:"Team"},{key:"score",label:"Score",fmt:v=>v.toFixed(1)},
+     {key:"opponent",label:"vs"},{key:"season",label:"When",fmt:(_ ,r)=>wk(r)}]);
+  section("💥 Biggest Blowouts", DATA.record_book.biggest_margins,
+    [{key:"winner",label:"Winner"},{key:"margin",label:"Margin",fmt:v=>v.toFixed(1)},
+     {key:"loser",label:"Loser"},{key:"season",label:"When",fmt:(_ ,r)=>wk(r)}]);
+  section("😬 Closest Games", DATA.record_book.closest_games,
+    [{key:"winner",label:"Winner"},{key:"margin",label:"Margin",fmt:v=>v.toFixed(1)},
+     {key:"loser",label:"Loser"},{key:"season",label:"When",fmt:(_ ,r)=>wk(r)}]);
+  section("📈 Highest Combined", DATA.record_book.highest_combined,
+    [{key:"total",label:"Total",fmt:v=>v.toFixed(1)},{key:"home_owner",label:"Home"},
+     {key:"away_owner",label:"Away"},{key:"season",label:"When",fmt:(_ ,r)=>wk(r)}]);
+  if(DATA.record_book.ties.length)
+    section("🤝 Ties", DATA.record_book.ties,
+      [{key:"owner_a",label:"Team A"},{key:"owner_b",label:"Team B"},
+       {key:"score",label:"Score",fmt:v=>v.toFixed(1)},{key:"season",label:"When",fmt:(_ ,r)=>wk(r)}]);
+};
+
 // header stats + first tab
 window.addEventListener("DOMContentLoaded",()=>{ switchTab("overview"); });
 </script>
