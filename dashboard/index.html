@@ -1006,29 +1006,39 @@ RENDERERS.h2h = function(){
     el("div",{class:"card-title"},"⚔️ The Domination Grid"),
     el("div",{class:"card-note"},"Each cell: the ROW owner's all-time win% against the COLUMN owner "+
       "(green = owns them, red = owned). Click any cell to load that rivalry below."));
+  const inactiveCb=el("input",{type:"checkbox"});
+  hmCard.append(el("label",{style:"display:inline-flex;align-items:center;gap:8px;"+
+      "font-size:.78rem;color:var(--text-dim);margin-bottom:10px;cursor:pointer"},
+    inactiveCb, "Include departed owners (2011–14 era)"));
   const hmWrap=el("div",{class:"hm-wrap"}); hmCard.append(hmWrap); root.append(hmCard);
-  const tbl=el("table",{class:"hm"});
-  const hrow=el("tr"); hrow.append(el("th",{}, ""));
-  matrix.owners.forEach(o=>hrow.append(el("th",{title:o}, o.slice(0,3))));
-  tbl.append(hrow);
-  matrix.owners.forEach(rowO=>{
-    const tr=el("tr"); tr.append(el("th",{class:"hm-row"}, rowO));
-    matrix.owners.forEach(colO=>{
-      if(rowO===colO){ tr.append(el("td",{class:"hm-empty"},"—")); return; }
-      const [x,y]=[rowO,colO].sort();
-      const cell=matrix.cells[`${x}|${y}`];
-      if(!cell){ tr.append(el("td",{class:"hm-empty"},"·")); return; }
-      const pct = rowO===x ? cell.a_pct : 1-cell.a_pct;
-      const td=el("td",{title:`${rowO} vs ${colO}: ${(pct*100).toFixed(0)}% over ${cell.games} games`,
-        style:`background:${heatColor(pct)};color:#fff`,
-        onclick:()=>{ a.value=rowO; b.value=colO; draw();
-          out.scrollIntoView({behavior:"smooth",block:"start"}); }},
-        Math.round(pct*100));
-      tr.append(td);
+  function buildGrid(){
+    const owners=matrix.owners.filter(o=>inactiveCb.checked||isActive(o));
+    hmWrap.innerHTML="";
+    const tbl=el("table",{class:"hm"});
+    const hrow=el("tr"); hrow.append(el("th",{}, ""));
+    owners.forEach(o=>hrow.append(el("th",{title:o}, o.slice(0,3))));
+    tbl.append(hrow);
+    owners.forEach(rowO=>{
+      const tr=el("tr"); tr.append(el("th",{class:"hm-row"}, rowO));
+      owners.forEach(colO=>{
+        if(rowO===colO){ tr.append(el("td",{class:"hm-empty"},"—")); return; }
+        const [x,y]=[rowO,colO].sort();
+        const cell=matrix.cells[`${x}|${y}`];
+        if(!cell){ tr.append(el("td",{class:"hm-empty"},"·")); return; }
+        const pct = rowO===x ? cell.a_pct : 1-cell.a_pct;
+        const td=el("td",{title:`${rowO} vs ${colO}: ${(pct*100).toFixed(0)}% over ${cell.games} games`,
+          style:`background:${heatColor(pct)};color:#fff`,
+          onclick:()=>{ a.value=rowO; b.value=colO; draw();
+            out.scrollIntoView && out.scrollIntoView({behavior:"smooth",block:"start"}); }},
+          Math.round(pct*100));
+        tr.append(td);
+      });
+      tbl.append(tr);
     });
-    tbl.append(tr);
-  });
-  hmWrap.append(tbl);
+    hmWrap.append(tbl);
+  }
+  inactiveCb.addEventListener("change",buildGrid);
+  buildGrid();
 
   root.append(el("div",{class:"card"}, el("div",{class:"card-title"},"Pick Two Teams"),
     a, el("span",{}," vs "), b));
