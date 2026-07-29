@@ -774,6 +774,42 @@ RENDERERS.records = function(){
        {key:"score",label:"Score",fmt:v=>v.toFixed(1)},{key:"season",label:"When",fmt:(_ ,r)=>wk(r)}]);
 };
 
+RENDERERS.owner = function(){
+  const root=document.getElementById("tab-owner"); root.innerHTML="";
+  const sel=el("select",{class:"season-select"});
+  OWNERS.forEach(o=>sel.append(el("option",{value:o},o)));
+  root.append(el("div",{class:"card"}, el("div",{class:"card-title"},"Select Owner"), sel));
+  const body=el("div"); root.append(body);
+  let chart=null;
+  function draw(owner){
+    if(chart){ chart.destroy(); chart=null; }
+    body.innerHTML="";
+    const c=DATA.owner_careers[owner];
+    const head=el("div",{class:"card"}, el("div",{class:"card-title"},owner),
+      el("div",{}, `🏆 Titles: ${c.titles.join(", ")||"none"}`),
+      el("div",{}, `💩 Last place: ${c.last_places.join(", ")||"none"}`),
+      el("div",{}, `🤝 Top rival (most losses to): ${c.top_rival||"—"}`),
+      el("div",{}, c.best_game?`🔥 Best game: ${c.best_game.score} (${c.best_game.season} Wk${c.best_game.week}) vs ${c.best_game.opponent}`:""),
+      el("div",{}, c.worst_game?`🧊 Worst game: ${c.worst_game.score} (${c.worst_game.season} Wk${c.worst_game.week}) vs ${c.worst_game.opponent}`:""));
+    body.append(head);
+    const chartCard=el("div",{class:"card"}, el("div",{class:"card-title"},"Finish by Season (lower = better)"));
+    const cw=el("div",{class:"chart-wrap"}); const canvas=el("canvas"); cw.append(canvas);
+    chartCard.append(cw); body.append(chartCard);
+    const seasons=c.seasons;
+    chart=new Chart(canvas,{type:"line",data:{labels:seasons.map(s=>s.season),
+      datasets:[{label:"Power Rank",data:seasons.map(s=>s.rank),
+        borderColor:OWNER_COLORS[owner],backgroundColor:OWNER_COLORS[owner],tension:0.2}]},
+      options:{scales:{y:{reverse:true,min:1,ticks:{stepSize:1}}},plugins:{legend:{display:false}}}});
+    const card=el("div",{class:"card"}, el("div",{class:"card-title"},"Season History"));
+    const wrap=el("div",{class:"table-scroll"}); card.append(wrap); body.append(card);
+    renderTable(wrap,[{key:"season",label:"Year"},{key:"rank",label:"Finish"},
+      {key:"wins",label:"W"},{key:"losses",label:"L"},
+      {key:"avg_score",label:"Avg",fmt:v=>v.toFixed(1)},
+      {key:"made_playoffs",label:"Playoffs",fmt:v=>v?"✓":""}], seasons);
+  }
+  sel.addEventListener("change",()=>draw(sel.value)); draw(OWNERS[0]);
+};
+
 // header stats + first tab
 window.addEventListener("DOMContentLoaded",()=>{ switchTab("overview"); });
 </script>
