@@ -1105,12 +1105,50 @@ RENDERERS.timeline = function(){
   });
   strip.append(chips); root.append(strip);
 
-  // Bump chart: every owner's finish per season (line per owner)
+  // Bump chart: finish per season, with a multi-select owner picker
   const seasons=DATA.meta.seasons;
+  const DEFAULT_OWNER = OWNERS.includes("Matt") ? "Matt" : OWNERS[0];
+  const selected = new Set([DEFAULT_OWNER]);
   const bumpCard=el("div",{class:"card"},
-    el("div",{class:"card-title"},"📈 Finish by Season — the whole league"),
-    el("div",{class:"card-note"},"Lower is better. Click names in the legend to show or hide owners "+
-      "(departed 2011–14 owners start hidden)."));
+    el("div",{class:"card-title"},"📈 Finish by Season"),
+    el("div",{class:"card-note"},"Lower is better. Pick any combination of owners below."));
+  // Owner picker (native dropdown via <details>, checkboxes inside)
+  const summary=el("summary",{class:"subnav-btn",style:"display:inline-block;list-style:none"},"");
+  const panel=el("div",{style:"padding:10px 4px 2px;display:grid;"+
+    "grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px"});
+  const picker=el("details",{style:"margin-bottom:6px"}, summary, panel);
+  const boxes={};
+  function summaryText(){
+    const n=selected.size;
+    const first=[...selected][0];
+    summary.textContent = n===0 ? "Select owners ▾"
+      : n===1 ? `${first} ▾`
+      : n===OWNERS.length ? "All owners ▾"
+      : `${first} +${n-1} more ▾`;
+  }
+  function applySelection(){
+    chart.data.datasets.forEach(ds=>{ ds.hidden=!selected.has(ds.label); });
+    chart.update();
+    summaryText();
+  }
+  OWNERS.forEach(o=>{
+    const cb=el("input",{type:"checkbox"});
+    cb.checked = selected.has(o);
+    cb.addEventListener("change",()=>{ cb.checked?selected.add(o):selected.delete(o); applySelection(); });
+    boxes[o]=cb;
+    panel.append(el("label",{style:"display:flex;align-items:center;gap:7px;font-size:.8rem;cursor:pointer"},
+      cb, el("span",{class:"chip-dot",style:`background:${OWNER_COLORS[o]};width:9px;height:9px;`+
+        "border-radius:50%;display:inline-block"}),
+      isActive(o)?o:o+" (inactive)"));
+  });
+  const quick=el("div",{style:"grid-column:1/-1;display:flex;gap:8px;margin-top:4px"});
+  [["Everyone",()=>OWNERS.forEach(o=>selected.add(o))],
+   ["Active 12",()=>{selected.clear(); OWNERS.filter(isActive).forEach(o=>selected.add(o));}],
+   ["Clear",()=>selected.clear()]].forEach(([lbl,fn])=>
+    quick.append(el("button",{class:"subnav-btn",onclick:()=>{ fn();
+      OWNERS.forEach(o=>{ boxes[o].checked=selected.has(o); }); applySelection(); }}, lbl)));
+  panel.append(quick);
+  bumpCard.append(picker);
   const bw=el("div",{class:"chart-wrap",style:"height:420px"}); const bcanvas=el("canvas");
   bw.append(bcanvas); bumpCard.append(bw); root.append(bumpCard);
   const datasets=OWNERS.map(o=>({
@@ -1121,13 +1159,17 @@ RENDERERS.timeline = function(){
     }),
     borderColor:OWNER_COLORS[o], backgroundColor:OWNER_COLORS[o],
     borderWidth:2, pointRadius:3, pointHoverRadius:6, tension:0.25,
-    spanGaps:false, hidden:!isActive(o),
+    spanGaps:false, hidden:!selected.has(o),
   }));
-  new Chart(bcanvas,{type:"line",
+  const chart=new Chart(bcanvas,{type:"line",
     data:{labels:seasons, datasets},
     options:{maintainAspectRatio:false, interaction:{mode:"nearest",intersect:false},
       scales:{y:{reverse:true,min:1,ticks:{stepSize:1},title:{display:true,text:"Finish"}}},
-      plugins:{legend:{position:"bottom",labels:{boxWidth:10,usePointStyle:true}}}}});
+      plugins:{legend:{position:"bottom",
+        labels:{boxWidth:10,usePointStyle:true,
+          filter:(item,data)=>!data.datasets[item.datasetIndex].hidden},
+        onClick:()=>{}}}}});   // picker is the single source of truth
+  summaryText();
 
   // Scoring environment trend with max/min band
   const tr=ANALYTICS.season_trends||[];
