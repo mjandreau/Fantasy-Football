@@ -475,6 +475,10 @@
 .hm td{ width:34px; height:28px; text-align:center; border:2px solid var(--bg); border-radius:4px; font-weight:700; cursor:pointer; }
 .hm td.hm-empty{ background:var(--surface); color:var(--border); cursor:default; }
 .hm td:hover:not(.hm-empty){ outline:2px solid var(--accent); }
+.subnav{ display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px; }
+.subnav-btn{ background:var(--surface); border:1px solid var(--border); color:var(--text-dim); border-radius:999px; padding:6px 14px; font-size:.78rem; font-weight:600; cursor:pointer; transition:all .15s; }
+.subnav-btn:hover{ color:var(--text); border-color:var(--green-bright); }
+.subnav-btn.active{ background:var(--green-deep); color:var(--green-bright); border-color:var(--green-bright); }
 .chip{ display:inline-flex; align-items:center; gap:6px; background:var(--surface); border:1px solid var(--border); border-radius:999px; padding:4px 12px; font-size:.75rem; margin:0 6px 6px 0; }
 .chip .chip-dot{ width:9px; height:9px; border-radius:50%; flex:none; }
 @media (max-width:900px){ .insight-grid{ grid-template-columns:1fr; } }
@@ -651,7 +655,14 @@ function renderTable(container, columns, rows, opts={}){
   columns.forEach(c=>{
     const th = c.position
       ? el("th",{style:"cursor:default"}, c.label)
-      : el("th",{onclick:()=>{ sortKey=c.key; sortDir=-sortDir; draw(); }}, c.label);
+      : el("th",{onclick:()=>{
+          if(sortKey===c.key){ sortDir=-sortDir; }          // same column: flip
+          else {
+            sortKey=c.key;
+            // stat columns start descending (biggest first); text starts A-Z
+            sortDir = (typeof (rows[0]||{})[c.key] === "string") ? 1 : -1;
+          }
+          draw(); }}, c.label);
     htr.append(th);
   });
   thead.append(htr); table.append(thead);
@@ -967,37 +978,50 @@ RENDERERS.h2h = function(){
 
 RENDERERS.records = function(){
   const root=document.getElementById("tab-records"); root.innerHTML="";
-  const section=(title, rows, cols)=>{
-    const card=el("div",{class:"card"}, el("div",{class:"card-title"},title));
-    const wrap=el("div",{class:"table-scroll"}); card.append(wrap); root.append(card);
-    renderTable(wrap, cols, rows);
-  };
   const wk=r=>`${r.season} Wk${r.week}${r.phase==="playoff"?" (PO)":""}`;
-  section("🔥 Highest Scores", DATA.record_book.highest_scores,
-    [{key:"owner",label:"Team"},{key:"score",label:"Score",fmt:v=>v.toFixed(1)},
-     {key:"opponent",label:"vs"},{key:"season",label:"When",fmt:(_ ,r)=>wk(r)}]);
-  section("🧊 Lowest Scores", DATA.record_book.lowest_scores,
-    [{key:"owner",label:"Team"},{key:"score",label:"Score",fmt:v=>v.toFixed(1)},
-     {key:"opponent",label:"vs"},{key:"season",label:"When",fmt:(_ ,r)=>wk(r)}]);
-  section("💥 Biggest Blowouts", DATA.record_book.biggest_margins,
-    [{key:"winner",label:"Winner"},{key:"margin",label:"Margin",fmt:v=>v.toFixed(1)},
-     {key:"loser",label:"Loser"},{key:"season",label:"When",fmt:(_ ,r)=>wk(r)}]);
-  section("😬 Closest Games", DATA.record_book.closest_games,
-    [{key:"winner",label:"Winner"},{key:"margin",label:"Margin",fmt:v=>v.toFixed(1)},
-     {key:"loser",label:"Loser"},{key:"season",label:"When",fmt:(_ ,r)=>wk(r)}]);
-  section("📈 Highest Combined", DATA.record_book.highest_combined,
-    [{key:"total",label:"Total",fmt:v=>v.toFixed(1)},{key:"home_owner",label:"Home"},
-     {key:"away_owner",label:"Away"},{key:"season",label:"When",fmt:(_ ,r)=>wk(r)}]);
-  if(DATA.record_book.ties.length)
-    section("🤝 Ties", DATA.record_book.ties,
-      [{key:"owner_a",label:"Team A"},{key:"owner_b",label:"Team B"},
-       {key:"score",label:"Score",fmt:v=>v.toFixed(1)},{key:"season",label:"When",fmt:(_ ,r)=>wk(r)}]);
-  section("🔥 Longest Streaks", ANALYTICS.streaks||[],
-    [{key:"owner",label:"Team"},
-     {key:"longest_win",label:"Win Streak"},{key:"win_span",label:"When"},
-     {key:"longest_loss",label:"Skid"},{key:"loss_span",label:"When"}]);
-  section("👑 Weekly Crowns (most weekly high scores)", (ANALYTICS.crowns||{}).all_time||[],
-    [{key:"owner",label:"Team"},{key:"crowns",label:"Crowns 👑"}]);
+  const whenCol={key:"season",label:"When",fmt:(_ ,r)=>wk(r)};
+  const SECTIONS=[
+    {id:"high",label:"🔥 Highest Scores",rows:DATA.record_book.highest_scores,
+     cols:[{key:"owner",label:"Team"},{key:"score",label:"Score",fmt:v=>v.toFixed(1)},
+           {key:"opponent",label:"vs"},whenCol]},
+    {id:"low",label:"🧊 Lowest Scores",rows:DATA.record_book.lowest_scores,
+     cols:[{key:"owner",label:"Team"},{key:"score",label:"Score",fmt:v=>v.toFixed(1)},
+           {key:"opponent",label:"vs"},whenCol]},
+    {id:"blowouts",label:"💥 Biggest Blowouts",rows:DATA.record_book.biggest_margins,
+     cols:[{key:"winner",label:"Winner"},{key:"margin",label:"Margin",fmt:v=>v.toFixed(1)},
+           {key:"loser",label:"Loser"},whenCol]},
+    {id:"closest",label:"😬 Closest Games",rows:DATA.record_book.closest_games,
+     cols:[{key:"winner",label:"Winner"},{key:"margin",label:"Margin",fmt:v=>v.toFixed(1)},
+           {key:"loser",label:"Loser"},whenCol]},
+    {id:"combined",label:"📈 Highest Combined",rows:DATA.record_book.highest_combined,
+     cols:[{key:"total",label:"Total",fmt:v=>v.toFixed(1)},{key:"home_owner",label:"Home"},
+           {key:"away_owner",label:"Away"},whenCol]},
+    {id:"ties",label:"🤝 Ties",rows:DATA.record_book.ties,
+     cols:[{key:"owner_a",label:"Team A"},{key:"owner_b",label:"Team B"},
+           {key:"score",label:"Score",fmt:v=>v.toFixed(1)},whenCol]},
+    {id:"streaks",label:"🔥 Longest Streaks",rows:ANALYTICS.streaks||[],
+     cols:[{key:"owner",label:"Team"},
+           {key:"longest_win",label:"Win Streak"},{key:"win_span",label:"When"},
+           {key:"longest_loss",label:"Skid"},{key:"loss_span",label:"When"}]},
+    {id:"crowns",label:"👑 Weekly Crowns",rows:(ANALYTICS.crowns||{}).all_time||[],
+     cols:[{key:"owner",label:"Team"},{key:"crowns",label:"Crowns 👑"}]},
+  ].filter(s=>s.rows && s.rows.length);
+
+  const nav=el("div",{class:"subnav",role:"tablist","aria-label":"Record book sections"});
+  const body=el("div");
+  root.append(nav, body);
+  function show(id){
+    [...nav.children].forEach(b=>b.classList.toggle("active", b.dataset.id===id));
+    const s=SECTIONS.find(x=>x.id===id);
+    body.innerHTML="";
+    const card=el("div",{class:"card"}, el("div",{class:"card-title"},s.label));
+    const wrap=el("div",{class:"table-scroll"}); card.append(wrap); body.append(card);
+    renderTable(wrap, s.cols, s.rows);
+  }
+  SECTIONS.forEach(s=>nav.append(
+    el("button",{class:"subnav-btn","data-id":s.id,role:"tab",
+      onclick:()=>show(s.id)}, s.label)));
+  show(SECTIONS[0].id);
 };
 
 RENDERERS.owner = function(){
