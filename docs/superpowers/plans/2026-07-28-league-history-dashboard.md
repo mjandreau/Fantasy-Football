@@ -44,7 +44,7 @@
                   "lowest_scores": ["..."], "biggest_margins": ["..."], "closest_games": ["..."],
                   "highest_combined": ["..."], "ties": ["..."]},
   "owner_careers": {"Walter": {"titles": [2011, 2012, 2025], "last_places": [],
-                               "seasons": [{"season": 2011, "rank": 1, "wins": 0, "losses": 0, "avg_score": 0.0, "made_playoffs": true}],
+                               "seasons": [{"season": 2011, "rank": 1, "wins": 0, "losses": 0, "avg_score": 0.0}],
                                "best_game": {}, "worst_game": {}, "top_rival": "Reid"}}
 }
 ```
@@ -989,7 +989,7 @@ git commit -m "feat: regular-season standings with Power Index"
 - Produces:
   - `head_to_head(games) -> dict` — keyed `"A|B"` (owners sorted), value per the contract (`a`,`b`,`a_wins`,`b_wins`,`ties`,`games`,`a_avg`,`b_avg`,`meetings[]`). All phases counted; each meeting tagged with its phase.
   - `record_book(games) -> dict` — `highest_scores`, `lowest_scores`, `biggest_margins`, `closest_games`, `highest_combined`, `ties`; each a list of up to 15 entries (all phases, phase-labeled).
-  - `owner_careers(games, champions) -> dict` — per owner: `titles`, `last_places`, `seasons[]` (season, rank, wins, losses, avg_score, made_playoffs), `best_game`, `worst_game`, `top_rival`.
+  - `owner_careers(games, champions) -> dict` — per owner: `titles`, `last_places`, `seasons[]` (season, rank, wins, losses, avg_score), `best_game`, `worst_game`, `top_rival`. (No `made_playoffs`: playoff sheets mix championship + consolation brackets, so it can't be derived reliably.)
 
 - [ ] **Step 1: Write the failing test**
 
@@ -1128,11 +1128,7 @@ def owner_careers(games, champions):
                 continue
             season_rows.append({"season": season, "rank": r["power_rank"],
                                 "wins": r["wins"], "losses": r["losses"],
-                                "avg_score": r["avg_score"],
-                                "made_playoffs": any(
-                                    x["season"] == season and x["phase"] == "playoff"
-                                    and owner in (x["home_owner"], x["away_owner"])
-                                    for x in games)})
+                                "avg_score": r["avg_score"]})
         rivals = rival_losses[owner]
         top_rival = max(rivals, key=rivals.get) if rivals else None
         careers[owner] = {"titles": sorted(titles[owner]),
@@ -1790,7 +1786,7 @@ RENDERERS.owner = function(){
     renderTable(wrap,[{key:"season",label:"Year"},{key:"rank",label:"Finish"},
       {key:"wins",label:"W"},{key:"losses",label:"L"},
       {key:"avg_score",label:"Avg",fmt:v=>v.toFixed(1)},
-      {key:"made_playoffs",label:"Playoffs",fmt:v=>v?"✓":""}], seasons);
+      ], seasons);
   }
   sel.addEventListener("change",()=>draw(sel.value)); draw(OWNERS[0]);
 };
