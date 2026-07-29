@@ -834,6 +834,18 @@ RENDERERS.rankings = function(){
   card.append(scopeNav);
   const wrap=el("div",{class:"table-scroll"}); card.append(wrap); root.append(card);
   const crownMap=Object.fromEntries(((ANALYTICS.crowns||{}).all_time||[]).map(c=>[c.owner,c.crowns]));
+  // First-round byes earned: in that season's playoffs but with no Round-1 game
+  const byeMap={};
+  DATA.meta.seasons.forEach(y=>{
+    const inPly=new Set(), inR1=new Set();
+    DATA.games.forEach(g=>{
+      if(g.season!==y||g.phase!=="playoff")return;
+      [g.home_owner,g.away_owner].forEach(o=>{
+        inPly.add(o); if(g.playoff_round===1) inR1.add(o);
+      });
+    });
+    inPly.forEach(o=>{ if(!inR1.has(o)) byeMap[o]=(byeMap[o]||0)+1; });
+  });
   const careerCols=o=>{
     const seasons=(DATA.owner_careers[o]?.seasons||[]);
     const ranks=seasons.map(s=>s.rank).filter(x=>x!=null);
@@ -867,7 +879,8 @@ RENDERERS.rankings = function(){
     rows.forEach(r=>{
       r.power_index=((r.avg_score/la)*80+r.win_pct*100)/7;
       Object.assign(r,careerCols(r.owner),
-        {owner_label:isActive(r.owner)?r.owner:r.owner+" (inactive)"});
+        {byes:byeMap[r.owner]||0,
+         owner_label:isActive(r.owner)?r.owner:r.owner+" (inactive)"});
     });
     rows.sort((a,b)=>b.power_index-a.power_index);
     return rows;
@@ -879,6 +892,9 @@ RENDERERS.rankings = function(){
        {key:"owner_label",label:"Team"},
        {key:"wins",label:"W"},{key:"losses",label:"L"},{key:"ties",label:"T"},
        {key:"games",label:"G"},
+       ...(scope!=="regular"
+         ? [{key:"byes",label:"Byes 🎫"}]   // explains the playoff game-count gap
+         : []),
        {key:"win_pct",label:"Win%",fmt:v=>(v*100).toFixed(1)+"%"},
        {key:"pf",label:"PF",fmt:v=>v.toFixed(0)},
        {key:"pa",label:"PA",fmt:v=>v.toFixed(0)},
