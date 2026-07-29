@@ -142,4 +142,69 @@ def build_lineups(espn_dir):
     return {"efficiency": rows(acc),
             "by_season": {y: rows(s) for y, s in sorted(per_season.items())},
             "blunders": blunders[:12],
-            "bench_records": bench[:12]}
+            "bench_records": bench[:12],
+            "all_time_teams": all_time_teams(espn_dir)}
+
+
+# Best-ever lineup slots per owner (points scored while on their roster).
+# Mirrors the league's actual lineup: offense + D/ST + one DL/LB/DB (IDP).
+_TEAM_SLOTS = [("QB", {"QB"}), ("RB1", {"RB"}), ("RB2", {"RB"}),
+               ("WR1", {"WR"}), ("WR2", {"WR"}), ("TE", {"TE"}),
+               ("K", {"K"}), ("D/ST", {"D/ST"}),
+               ("DL", {"DE", "DT"}), ("LB", {"LB"}), ("DB", {"CB", "S"})]
+
+
+def all_time_teams(espn_dir):
+    """For each owner: the highest-scoring player they've ever rostered at each
+    lineup slot, by total points accrued while on that owner's roster (2019+)."""
+    espn_dir = Path(espn_dir)
+    tally = defaultdict(lambda: defaultdict(
+        lambda: {"points": 0.0, "seasons": set(), "pos": None, "name": None}))
+    for bs_path in sorted(espn_dir.glob("boxscores_*.json")):
+        year = int(bs_path.stem.split("_")[1])
+        league = json.loads((espn_dir / f"league_{year}.json").read_text())
+        owner_by_id = {t["team_id"]: owner_for_team(t) for t in league["teams"]}
+        max_week = (league.get("reg_season_weeks") or 14) + 3
+        data = json.loads(bs_path.read_text())
+        counted = set()
+        for wk, matchups in data["weeks"].items():
+            if int(wk) > max_week:
+                continue
+            for m in matchups:
+                for side in ("home", "away"):
+                    tid = m[f"{side}_team_id"]
+                    if tid is None:
+                        continue
+                    owner = owner_by_id[tid]
+                    for p in m[f"{side}_lineup"]:
+                        key = (owner, p["player_id"], int(wk), year)
+                        if key in counted:
+                            continue
+                        counted.add(key)
+                        t = tally[owner][p["player_id"]]
+                        t["points"] += p["points"]
+                        t["seasons"].add(year)
+                        t["name"] = p["name"]
+                        if p.get("position"):
+                            t["pos"] = p["position"]
+
+    out = {}
+    for owner, players in tally.items():
+        ranked = sorted(players.values(), key=lambda t: -t["points"])
+        used = set()
+        team = []
+        for slot, poses in _TEAM_SLOTS:
+            best = next((t for t in ranked
+                         if t["pos"] in poses and id(t) not in used), None)
+            if best:
+                used.add(id(best))
+                yrs = sorted(best["seasons"])
+                span = str(yrs[0]) if len(yrs) == 1 else f"{yrs[0]}–{yrs[-1]}"
+                team.append({"slot": slot, "player": best["name"],
+                             "pos": best["pos"], "points": round(best["points"], 1),
+                             "seasons": span})
+            else:
+                team.append({"slot": slot, "player": "—", "pos": "/".join(sorted(poses)),
+                             "points": 0, "seasons": ""})
+        out[owner] = team
+    return out

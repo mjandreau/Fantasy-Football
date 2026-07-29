@@ -105,6 +105,39 @@ def scrape_box_scores(lg, year):
     return {"year": year, "weeks": weeks}
 
 
+def scrape_core_positions():
+    """Position for every drafted player ever, via ESPN's public core athlete
+    API (works for long-retired players). Negative ids are D/ST units.
+    Resumable: already-fetched ids are skipped."""
+    import requests
+    path = OUT / "players_core.json"
+    existing = json.loads(path.read_text()) if path.exists() else {}
+    all_ids = set()
+    for lg_path in OUT.glob("league_*.json"):
+        for p in json.loads(lg_path.read_text())["draft"]:
+            all_ids.add(p["player_id"])
+    todo = [i for i in sorted(all_ids) if str(i) not in existing]
+    print(f"core positions: {len(existing)} cached, {len(todo)} to fetch")
+    for n, pid in enumerate(todo, 1):
+        if pid < 0:
+            existing[str(pid)] = {"pos": "D/ST"}
+            continue
+        try:
+            r = requests.get("https://sports.core.api.espn.com/v2/sports/"
+                             f"football/leagues/nfl/athletes/{pid}", timeout=20)
+            pos = ((r.json().get("position") or {}).get("abbreviation")
+                   if r.status_code == 200 else None)
+            existing[str(pid)] = {"pos": pos or "?"}
+        except Exception:
+            existing[str(pid)] = {"pos": "?"}
+        if n % 100 == 0:
+            path.write_text(json.dumps(existing))
+            print(f"  {n}/{len(todo)}")
+        time.sleep(0.08)
+    path.write_text(json.dumps(existing))
+    print(f"core positions done: {len(existing)} total")
+
+
 def main():
     force = "--force" in sys.argv
     creds = json.loads(CREDS.read_text())
@@ -135,6 +168,7 @@ def main():
             n = sum(len(v) for v in bs["weeks"].values())
             summary.append(f"{year}: box scores ok ({len(bs['weeks'])} weeks, {n} matchups)")
     print("\n".join(summary))
+    scrape_core_positions()
     print("done ->", OUT)
 
 

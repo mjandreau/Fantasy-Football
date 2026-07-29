@@ -40,6 +40,20 @@ def test_blunders_sorted(lineups):
         assert b["wasted"] > 20                  # blunders are big misses
 
 
+def test_all_time_teams(lineups):
+    teams = lineups["all_time_teams"]
+    assert len(teams) == 12
+    for owner, team in teams.items():
+        slots = [r["slot"] for r in team]
+        assert slots == ["QB", "RB1", "RB2", "WR1", "WR2", "TE", "K", "D/ST",
+                         "DL", "LB", "DB"]
+        qb = team[0]
+        assert qb["pos"] == "QB" and qb["points"] > 100
+        rb1, rb2 = team[1], team[2]
+        assert rb1["points"] >= rb2["points"]
+        assert rb1["player"] != rb2["player"] or rb1["player"] == "—"
+
+
 def test_bench_records(lineups):
     br = lineups["bench_records"]
     assert len(br) >= 5
