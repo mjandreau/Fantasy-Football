@@ -12,7 +12,8 @@ GENERATED = "2026-07-28"  # bump when rebuilding
 
 def main():
     data, report = assemble(DATA / "League Schedule History.xlsx",
-                            DATA / "The Gridiron.xlsx", generated=GENERATED)
+                            DATA / "The Gridiron.xlsx", generated=GENERATED,
+                            espn_dir=DATA / "espn")
     (BUILD / "league_data.json").write_text(json.dumps(data, indent=2), encoding="utf-8")
     (BUILD / "reconciliation.md").write_text(report, encoding="utf-8")
     if DASHBOARD.exists():

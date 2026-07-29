@@ -1,13 +1,16 @@
 from build.games import build_games, season_team_names
 from build.loaders import parse_gridiron
 from build.reconcile import flag_conflicts, reconciliation_report
+from pathlib import Path
+
 from build.metrics import standings, head_to_head, record_book, owner_careers
 from build.analytics import build_analytics, build_insights
+from build.lineups import build_lineups
 from build.curated import CHAMPIONS, validate_curated
 from build.normalize import ALL_TIME_OWNERS, ACTIVE_OWNERS
 
 
-def assemble(history_path, gridiron_path, generated):
+def assemble(history_path, gridiron_path, generated, espn_dir=None):
     validate_curated(ALL_TIME_OWNERS)
     games = build_games(history_path)
     grid = parse_gridiron(gridiron_path)
@@ -30,4 +33,10 @@ def assemble(history_path, gridiron_path, generated):
         "analytics": build_analytics(games),
         "insights": build_insights(games),
     }
+    # Lineup analytics need the local ESPN cache (2019+ box scores); the
+    # dashboard degrades gracefully when it's absent.
+    if espn_dir and Path(espn_dir).exists() and list(Path(espn_dir).glob("boxscores_*.json")):
+        data["lineups"] = build_lineups(espn_dir)
+    else:
+        data["lineups"] = None
     return data, report

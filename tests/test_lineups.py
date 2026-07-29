@@ -1,0 +1,48 @@
+from pathlib import Path
+
+import pytest
+
+from build.lineups import build_lineups
+
+ESPN_DIR = Path(__file__).resolve().parent.parent / "data" / "espn"
+
+
+@pytest.fixture
+def lineups():
+    if not ESPN_DIR.exists() or not list(ESPN_DIR.glob("boxscores_*.json")):
+        pytest.skip("ESPN cache not present")
+    return build_lineups(ESPN_DIR)
+
+
+def test_efficiency_table(lineups):
+    rows = lineups["efficiency"]
+    assert len(rows) == 12                      # all active owners map
+    for r in rows:
+        assert r["optimal"] >= r["actual"] > 0  # optimal is an upper bound
+        assert 0.5 < r["efficiency"] <= 1.0
+        assert r["wasted"] == pytest.approx(r["optimal"] - r["actual"], abs=0.1)
+        assert r["games"] > 50                   # 7 seasons of weekly lineups
+
+
+def test_per_season_shape(lineups):
+    per = lineups["by_season"]
+    assert set(per.keys()) == {str(y) for y in range(2019, 2026)}
+    assert len(per["2025"]) == 12
+
+
+def test_blunders_sorted(lineups):
+    bl = lineups["blunders"]
+    assert 5 <= len(bl) <= 15
+    wasted = [b["wasted"] for b in bl]
+    assert wasted == sorted(wasted, reverse=True)
+    for b in bl:
+        assert b["owner"] and b["season"] and b["benched_star"]
+        assert b["wasted"] > 20                  # blunders are big misses
+
+
+def test_bench_records(lineups):
+    br = lineups["bench_records"]
+    assert len(br) >= 5
+    pts = [b["points"] for b in br]
+    assert pts == sorted(pts, reverse=True)
+    assert pts[0] >= 40                          # someone benched a monster
