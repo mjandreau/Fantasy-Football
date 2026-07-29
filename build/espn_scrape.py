@@ -38,6 +38,12 @@ def team_blob(t):
         "points_against": round(t.points_against, 1),
         "final_standing": getattr(t, "final_standing", None),
         "standing": getattr(t, "standing", None),
+        # season transaction counters (survive even for ancient seasons)
+        "acquisitions": getattr(t, "acquisitions", 0),
+        "drops": getattr(t, "drops", 0),
+        "trades": getattr(t, "trades", 0),
+        "faab_spent": getattr(t, "acquisition_budget_spent", 0),
+        "waiver_rank": getattr(t, "waiver_rank", None),
     }
 
 
@@ -105,6 +111,36 @@ def scrape_box_scores(lg, year):
     return {"year": year, "weeks": weeks}
 
 
+def settings_blob(lg, year):
+    """The league's exact rulebook that season — Phase 2's pricing ground truth."""
+    s = lg.settings
+    return {
+        "year": year,
+        "name": s.name,
+        "reg_season_weeks": getattr(s, "reg_season_count", None),
+        "playoff_teams": getattr(s, "playoff_team_count", None),
+        "keeper_count": getattr(s, "keeper_count", None),
+        "faab": getattr(s, "faab", None),
+        "trade_deadline": getattr(s, "trade_deadline", None),
+        "roster_slots": getattr(s, "position_slot_counts", None),
+        "scoring": getattr(s, "scoring_format", None),
+    }
+
+
+def free_agents_blob(lg, year, size=400):
+    """End-of-season free-agent pool with league-scored season totals —
+    the replacement-level baseline for valuation work."""
+    out = []
+    for p in lg.free_agents(size=size):
+        out.append({"player_id": p.playerId, "name": p.name,
+                    "position": getattr(p, "position", None),
+                    "pro_team": getattr(p, "proTeam", None),
+                    "points": round(getattr(p, "total_points", 0.0) or 0.0, 1),
+                    "projected": round(getattr(p, "projected_total_points", 0.0) or 0.0, 1),
+                    "percent_owned": round(getattr(p, "percent_owned", 0.0) or 0.0, 1)})
+    return {"year": year, "free_agents": out}
+
+
 def scrape_core_positions():
     """Position for every drafted player ever, via ESPN's public core athlete
     API (works for long-retired players). Negative ids are D/ST units.
@@ -146,9 +182,13 @@ def main():
     for year in YEARS:
         lg_path = OUT / f"league_{year}.json"
         bs_path = OUT / f"boxscores_{year}.json"
+        st_path = OUT / f"settings_{year}.json"
+        fa_path = OUT / f"free_agents_{year}.json"
         need_lg = force or not lg_path.exists()
         need_bs = year in BOX_SCORE_YEARS and (force or not bs_path.exists())
-        if not need_lg and not need_bs:
+        need_st = force or not st_path.exists()
+        need_fa = force or not fa_path.exists()
+        if not (need_lg or need_bs or need_st or need_fa):
             summary.append(f"{year}: cached, skipped")
             continue
         try:
@@ -157,6 +197,20 @@ def main():
         except Exception as e:
             summary.append(f"{year}: LEAGUE FETCH FAILED ({type(e).__name__})")
             continue
+        if need_st:
+            try:
+                st_path.write_text(json.dumps(settings_blob(lg, year), indent=1))
+                summary.append(f"{year}: settings ok")
+            except Exception as e:
+                summary.append(f"{year}: settings FAILED ({type(e).__name__})")
+        if need_fa:
+            try:
+                fa = free_agents_blob(lg, year)
+                fa_path.write_text(json.dumps(fa))
+                summary.append(f"{year}: free agents ok ({len(fa['free_agents'])})")
+            except Exception as e:
+                summary.append(f"{year}: free agents n/a ({type(e).__name__})")
+            time.sleep(SLEEP)
         if need_lg:
             data = scrape_league(lg, year)
             lg_path.write_text(json.dumps(data, indent=1))
