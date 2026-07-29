@@ -814,7 +814,7 @@ RENDERERS.overview = function(){
   root.append(grid2);
   renderTable(curWrap,
     [{key:"power_rank",label:"#"},{key:"owner",label:"Team"},
-     {key:"wins",label:"W"},{key:"losses",label:"L"},
+     {key:"wins",label:"W"},{key:"losses",label:"L"},{key:"ties",label:"T"},
      {key:"avg_score",label:"Avg",fmt:v=>v.toFixed(1)},
      {key:"power_index",label:"P-Idx",fmt:v=>v.toFixed(2)}],
     curRows);
