@@ -8,9 +8,10 @@ from pathlib import Path
 
 from build.lineups import owner_for_team
 
-# The league runs two separate drafts each year: offense (+K) and defense
-# (D/ST + individual defenders). Everything side-specific keys off position.
-_OFF_POS = {"QB", "RB", "WR", "TE", "K", "FB"}
+# The league runs two separate drafts each year. The main ("offensive") draft
+# includes K and team D/ST; the defensive draft is individual defenders only
+# (3 rounds: DL/LB/DB). Everything side-specific keys off position.
+_OFF_POS = {"QB", "RB", "WR", "TE", "K", "FB", "D/ST"}
 
 
 def _side(pos):

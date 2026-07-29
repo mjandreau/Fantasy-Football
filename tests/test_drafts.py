@@ -47,10 +47,15 @@ def test_pick_enrichment(drafts):
     v = drafts["years"]["2011"]["picks"][0]
     assert v["pos"] == "QB"            # Michael Vick
     assert v["points"] is None and v["pro_team"] is None
-    # D/ST picks resolve to a position everywhere
+    # D/ST picks resolve to a position everywhere — and belong to the MAIN
+    # (offensive) draft; the defensive draft is individual defenders only
     dst = [p for y in drafts["years"].values() for p in y["picks"]
            if p["player_id"] < 0]
-    assert dst and all(p["pos"] == "D/ST" for p in dst)
+    assert dst and all(p["pos"] == "D/ST" and p["side"] == "OFF" for p in dst)
+    # modern defensive draft = 3 rounds x 12 teams
+    d25 = [p for p in drafts["years"]["2025"]["picks"] if p["side"] == "DEF"]
+    assert len(d25) == 36
+    assert all(p["pos"] in {"DE", "DT", "LB", "CB", "S"} for p in d25)
 
 
 def test_value_analysis(drafts):
