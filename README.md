@@ -98,10 +98,8 @@ spreadsheet only needs updating at season's end — or not at all.
   commands; a one-command refresh script). The public site is static, so "the
   refresh button" is running that command locally — credentials never leave
   this machine.
-- **Phase 2: valuation & draft model** — **private, not part of this repo's
-  public content.** Model code, data, and outputs will live outside the public
-  repo. Groundwork already cached locally: exact per-season scoring rulebooks
-  and end-of-season free-agent pools (replacement-level baselines).
+- **Phase 2: valuation & draft model** — built and maintained **privately,
+  outside this repo**. Not part of the public site, by design.
 
 ## Development notes
 
