@@ -405,6 +405,19 @@
   .rank-badge.rank-2{ background:linear-gradient(180deg, var(--silver), #8fa19b); color:#1a1f1d; border-color:#8fa19b; }
   .rank-badge.rank-3{ background:linear-gradient(180deg, var(--bronze), #93582a); color:#241202; border-color:#93582a; }
 
+  .leader-list{ display:flex; flex-direction:column; gap:0.4rem; }
+  .leader-row{
+    display:flex;
+    align-items:center;
+    gap:0.65rem;
+    padding:0.4rem 0.6rem;
+    background:var(--surface-2);
+    border:1px solid var(--border);
+    border-radius:var(--radius-sm);
+  }
+  .leader-owner{ flex:1 1 auto; font-weight:600; font-size:0.88rem; }
+  .leader-count{ flex:0 0 auto; }
+
   .stat-good{ color:var(--green-bright); }
   .stat-bad{ color:var(--danger); }
 
@@ -487,14 +500,14 @@
 
 <main class="content">
 
-  <section class="tab active" id="tab-overview">
+  <section class="tab active" id="tab-overview" role="tabpanel">
     <div class="tab-header">
       <span class="tab-kicker">01</span>
       <h2>Overview</h2>
     </div>
   </section>
 
-  <section class="tab" id="tab-rankings">
+  <section class="tab" id="tab-rankings" role="tabpanel">
     <div class="tab-header">
       <span class="tab-kicker">02</span>
       <h2>All-Time Rankings</h2>
@@ -502,7 +515,7 @@
     <p class="card-note">Power rankings and career records across all 15 seasons land here.</p>
   </section>
 
-  <section class="tab" id="tab-season">
+  <section class="tab" id="tab-season" role="tabpanel">
     <div class="tab-header">
       <span class="tab-kicker">03</span>
       <h2>Season-by-Season</h2>
@@ -510,7 +523,7 @@
     <p class="card-note">Standings and results for each individual season land here.</p>
   </section>
 
-  <section class="tab" id="tab-h2h">
+  <section class="tab" id="tab-h2h" role="tabpanel">
     <div class="tab-header">
       <span class="tab-kicker">04</span>
       <h2>Head-to-Head</h2>
@@ -518,7 +531,7 @@
     <p class="card-note">Owner-vs-owner all-time matchup records land here.</p>
   </section>
 
-  <section class="tab" id="tab-records">
+  <section class="tab" id="tab-records" role="tabpanel">
     <div class="tab-header">
       <span class="tab-kicker">05</span>
       <h2>Record Book</h2>
@@ -526,7 +539,7 @@
     <p class="card-note">Single-game and season records, streaks, and superlatives land here.</p>
   </section>
 
-  <section class="tab" id="tab-owner">
+  <section class="tab" id="tab-owner" role="tabpanel">
     <div class="tab-header">
       <span class="tab-kicker">06</span>
       <h2>Owner Deep Dive</h2>
@@ -580,6 +593,9 @@ function renderTable(container, columns, rows){
     const data=[...rows];
     if(sortKey) data.sort((a,b)=>{
       const x=a[sortKey], y=b[sortKey];
+      if(x==null && y==null) return 0;
+      if(x==null) return 1;
+      if(y==null) return -1;
       return (x>y?1:x<y?-1:0)*sortDir;
     });
     tbody.innerHTML="";
@@ -596,7 +612,11 @@ const RENDERERS={};
 const rendered=new Set();
 function switchTab(name){
   document.querySelectorAll(".tab").forEach(s=>s.classList.toggle("active", s.id==="tab-"+name));
-  document.querySelectorAll(".nav-btn").forEach(b=>b.classList.toggle("active", b.dataset.tab===name));
+  document.querySelectorAll(".nav-btn").forEach(b=>{
+    const active=b.dataset.tab===name;
+    b.classList.toggle("active", active);
+    b.setAttribute("aria-selected", active?"true":"false");
+  });
   if(!rendered.has(name) && RENDERERS[name]){ RENDERERS[name](); rendered.add(name); }
 }
 document.querySelectorAll(".nav-btn").forEach(b=>b.addEventListener("click",()=>switchTab(b.dataset.tab)));
@@ -622,7 +642,14 @@ RENDERERS.overview = function(){
   Object.values(DATA.champions).forEach(r=>titleCounts[r.champion]=(titleCounts[r.champion]||0)+1);
   const leaders=Object.entries(titleCounts).sort((a,b)=>b[1]-a[1]);
   const leadCard=el("div",{class:"card"}, el("div",{class:"card-title"},"👑 Most Titles"));
-  leaders.forEach(([o,n])=>leadCard.append(el("div",{},`${o}: ${n}`)));
+  const leadList=el("div",{class:"leader-list"});
+  leaders.forEach(([o,n],i)=>{
+    leadList.append(el("div",{class:"leader-row"},
+      el("span",{class:"rank-badge"+(i<3?" rank-"+(i+1):"")}, i+1),
+      el("span",{class:"leader-owner"}, o),
+      el("span",{class:"pill leader-count"}, `🏆 ${n}`)));
+  });
+  leadCard.append(leadList);
   // Current season snapshot
   const cur=DATA.meta.seasons[DATA.meta.seasons.length-1];
   const curRows=DATA.season_standings[String(cur)];
@@ -673,7 +700,7 @@ RENDERERS.rankings = function(){
 RENDERERS.season = function(){
   const root=document.getElementById("tab-season"); root.innerHTML="";
   const seasons=[...DATA.meta.seasons].reverse();
-  const select=el("select",{class:"season-select"});
+  const select=el("select",{class:"season-select",'aria-label':"Select season to view"});
   seasons.forEach(y=>select.append(el("option",{value:y},y)));
   root.append(el("div",{class:"card"}, el("div",{class:"card-title"},"Select Season"), select));
   const body=el("div"); root.append(body);
@@ -713,9 +740,11 @@ RENDERERS.season = function(){
 
 RENDERERS.h2h = function(){
   const root=document.getElementById("tab-h2h"); root.innerHTML="";
-  const mk=()=>{ const s=el("select",{class:"season-select"});
+  const mk=(label)=>{ const s=el("select",{class:"season-select",'aria-label':label});
     OWNERS.forEach(o=>s.append(el("option",{value:o},o))); return s; };
-  const a=mk(), b=mk(); b.selectedIndex=1;
+  const a=mk("Select first owner for head-to-head comparison"),
+        b=mk("Select second owner for head-to-head comparison");
+  b.selectedIndex=1;
   root.append(el("div",{class:"card"}, el("div",{class:"card-title"},"Pick Two Teams"),
     a, el("span",{}," vs "), b));
   const out=el("div"); root.append(out);
@@ -776,7 +805,7 @@ RENDERERS.records = function(){
 
 RENDERERS.owner = function(){
   const root=document.getElementById("tab-owner"); root.innerHTML="";
-  const sel=el("select",{class:"season-select"});
+  const sel=el("select",{class:"season-select",'aria-label':"Select owner to view career history"});
   OWNERS.forEach(o=>sel.append(el("option",{value:o},o)));
   root.append(el("div",{class:"card"}, el("div",{class:"card-title"},"Select Owner"), sel));
   const body=el("div"); root.append(body);
@@ -810,7 +839,6 @@ RENDERERS.owner = function(){
   sel.addEventListener("change",()=>draw(sel.value)); draw(OWNERS[0]);
 };
 
-// header stats + first tab
 window.addEventListener("DOMContentLoaded",()=>{ switchTab("overview"); });
 </script>
 
