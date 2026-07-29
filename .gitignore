@@ -13,3 +13,8 @@ build/reconciliation.md
 
 # Controller scratch — never committed/published
 .superpowers/
+
+# ESPN credentials + any docx notes — never commit
+data/espn_credentials.json
+*.docx
+data/espn/
