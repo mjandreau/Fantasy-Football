@@ -823,43 +823,79 @@ RENDERERS.overview = function(){
 RENDERERS.rankings = function(){
   const root=document.getElementById("tab-rankings"); root.innerHTML="";
   const card=el("div",{class:"card"},
-    el("div",{class:"card-title"},"🏈 All-Time Standings (Regular Season)"),
+    el("div",{class:"card-title"},"🏈 All-Time Standings"),
     el("div",{class:"card-note"},"Click a column to sort — the # renumbers with the sort. "+
       "Departed owners (2011–14 era) stay pinned at the bottom, outside the sort. "+
       "Finish columns are regular-season power rank (a 🥇 best finish without a 🏆 means "+
       "they topped the regular season but lost the bracket)."));
+  // Scope toggle: which games count toward the record columns
+  const scopes=[["regular","Regular Season"],["all","Incl. Playoffs"],["playoff","Playoffs Only"]];
+  const scopeNav=el("div",{class:"subnav",role:"tablist","aria-label":"Standings scope"});
+  card.append(scopeNav);
   const wrap=el("div",{class:"table-scroll"}); card.append(wrap); root.append(card);
   const crownMap=Object.fromEntries(((ANALYTICS.crowns||{}).all_time||[]).map(c=>[c.owner,c.crowns]));
-  const rows=DATA.all_time_standings.map(r=>{
-    const seasons=(DATA.owner_careers[r.owner]?.seasons||[]);
+  const careerCols=o=>{
+    const seasons=(DATA.owner_careers[o]?.seasons||[]);
     const ranks=seasons.map(s=>s.rank).filter(x=>x!=null);
-    return {...r,
-     owner_label: isActive(r.owner) ? r.owner : r.owner + " (inactive)",
-     crowns: crownMap[r.owner]||0,
-     avg_finish: ranks.length ? ranks.reduce((a,b)=>a+b,0)/ranks.length : null,
-     top3: ranks.filter(x=>x<=3).length,
-     best_finish: ranks.length ? Math.min(...ranks) : null,
-     worst_finish: ranks.length ? Math.max(...ranks) : null,
-     titles:(DATA.owner_careers[r.owner]?.titles||[]).length};
-  });
-  renderTable(wrap,
-    [{position:true,label:"#"},
-     {key:"owner_label",label:"Team"},
-     {key:"wins",label:"W"},{key:"losses",label:"L"},{key:"ties",label:"T"},
-     {key:"games",label:"G"},
-     {key:"win_pct",label:"Win%",fmt:v=>(v*100).toFixed(1)+"%"},
-     {key:"pf",label:"PF",fmt:v=>v.toFixed(0)},
-     {key:"pa",label:"PA",fmt:v=>v.toFixed(0)},
-     {key:"avg_score",label:"Avg",fmt:v=>v.toFixed(1)},
-     {key:"power_index",label:"P-Idx",fmt:v=>v.toFixed(2)},
-     {key:"avg_finish",label:"Avg Fin",fmt:v=>v==null?"—":v.toFixed(1)},
-     {key:"top3",label:"Top 3s"},
-     {key:"best_finish",label:"Best",fmt:v=>v==null?"—":(v===1?"🥇":v)},
-     {key:"worst_finish",label:"Worst",fmt:v=>v==null?"—":v},
-     {key:"crowns",label:"👑"},
-     {key:"titles",label:"Titles",fmt:v=>v?"🏆".repeat(v):"—"}],
-    rows,
-    {pinBottom: r=>!isActive(r.owner)});
+    return {crowns:crownMap[o]||0,
+      avg_finish:ranks.length?ranks.reduce((a,b)=>a+b,0)/ranks.length:null,
+      top3:ranks.filter(x=>x<=3).length,
+      best_finish:ranks.length?Math.min(...ranks):null,
+      worst_finish:ranks.length?Math.max(...ranks):null,
+      titles:(DATA.owner_careers[o]?.titles||[]).length};
+  };
+  // Aggregate records over the chosen scope (same formulas as the pipeline)
+  function scopedRows(scope){
+    const acc={};
+    DATA.games.forEach(g=>{
+      if(scope==="regular"&&g.phase!=="regular")return;
+      if(scope==="playoff"&&g.phase!=="playoff")return;
+      [[g.home_owner,g.home_score,g.away_score],[g.away_owner,g.away_score,g.home_score]]
+        .forEach(([o,own,opp])=>{
+          const a=acc[o]||(acc[o]={owner:o,wins:0,losses:0,ties:0,pf:0,pa:0,games:0});
+          a.pf+=own; a.pa+=opp; a.games++;
+          if(g.tie)a.ties++; else if(own>opp)a.wins++; else a.losses++;
+        });
+    });
+    const rows=Object.values(acc);
+    rows.forEach(r=>{
+      r.avg_score=r.pf/r.games;
+      const dec=r.wins+r.losses+r.ties;
+      r.win_pct=dec?(r.wins+0.5*r.ties)/dec:0;
+    });
+    const la=rows.reduce((s,r)=>s+r.avg_score,0)/rows.length;
+    rows.forEach(r=>{
+      r.power_index=((r.avg_score/la)*80+r.win_pct*100)/7;
+      Object.assign(r,careerCols(r.owner),
+        {owner_label:isActive(r.owner)?r.owner:r.owner+" (inactive)"});
+    });
+    rows.sort((a,b)=>b.power_index-a.power_index);
+    return rows;
+  }
+  function drawTable(scope){
+    [...scopeNav.children].forEach(b=>b.classList.toggle("active",b.dataset.id===scope));
+    renderTable(wrap,
+      [{position:true,label:"#"},
+       {key:"owner_label",label:"Team"},
+       {key:"wins",label:"W"},{key:"losses",label:"L"},{key:"ties",label:"T"},
+       {key:"games",label:"G"},
+       {key:"win_pct",label:"Win%",fmt:v=>(v*100).toFixed(1)+"%"},
+       {key:"pf",label:"PF",fmt:v=>v.toFixed(0)},
+       {key:"pa",label:"PA",fmt:v=>v.toFixed(0)},
+       {key:"avg_score",label:"Avg",fmt:v=>v.toFixed(1)},
+       {key:"power_index",label:"P-Idx",fmt:v=>v.toFixed(2)},
+       {key:"avg_finish",label:"Avg Fin",fmt:v=>v==null?"—":v.toFixed(1)},
+       {key:"top3",label:"Top 3s"},
+       {key:"best_finish",label:"Best",fmt:v=>v==null?"—":(v===1?"🥇":v)},
+       {key:"worst_finish",label:"Worst",fmt:v=>v==null?"—":v},
+       {key:"crowns",label:"👑"},
+       {key:"titles",label:"Titles",fmt:v=>v?"🏆".repeat(v):"—"}],
+      scopedRows(scope),
+      {pinBottom: r=>!isActive(r.owner)});
+  }
+  scopes.forEach(([id,label])=>scopeNav.append(
+    el("button",{class:"subnav-btn","data-id":id,role:"tab",onclick:()=>drawTable(id)},label)));
+  drawTable("regular");
   const chartCard=el("div",{class:"card"}, el("div",{class:"card-title"},"Power Index (all owners)"));
   const cw=el("div",{class:"chart-wrap"}); const canvas=el("canvas"); cw.append(canvas);
   chartCard.append(cw); root.append(chartCard);
@@ -874,7 +910,7 @@ RENDERERS.rankings = function(){
     el("div",{class:"card-note"},"Career average regular-season finish — shorter bar is better."));
   const afw=el("div",{class:"chart-wrap"}); const afCanvas=el("canvas");
   afw.append(afCanvas); afCard.append(afw); root.append(afCard);
-  const afRows=rows.filter(r=>r.avg_finish!=null&&isActive(r.owner))
+  const afRows=scopedRows("regular").filter(r=>r.avg_finish!=null&&isActive(r.owner))
     .sort((x,y)=>x.avg_finish-y.avg_finish);
   new Chart(afCanvas,{type:"bar",
     data:{labels:afRows.map(r=>r.owner),
