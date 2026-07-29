@@ -5,7 +5,7 @@ from pathlib import Path
 
 from build.metrics import standings, head_to_head, record_book, owner_careers
 from build.analytics import build_analytics, build_insights
-from build.lineups import build_lineups
+from build.lineups import build_lineups, final_standings
 from build.drafts import build_drafts
 from build.curated import CHAMPIONS, validate_curated
 from build.normalize import ALL_TIME_OWNERS, ACTIVE_OWNERS
@@ -42,6 +42,8 @@ def assemble(history_path, gridiron_path, generated, espn_dir=None):
         data["lineups"] = None
     if espn_dir and Path(espn_dir).exists() and list(Path(espn_dir).glob("league_*.json")):
         data["drafts"] = build_drafts(espn_dir)
+        data["final_standings"] = final_standings(espn_dir)
     else:
         data["drafts"] = None
+        data["final_standings"] = None
     return data, report

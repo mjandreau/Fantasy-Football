@@ -54,6 +54,21 @@ def test_all_time_teams(lineups):
         assert rb1["player"] != rb2["player"] or rb1["player"] == "—"
 
 
+def test_final_standings():
+    if not ESPN_DIR.exists() or not list(ESPN_DIR.glob("league_*.json")):
+        pytest.skip("ESPN cache not present")
+    from build.lineups import final_standings
+    from build.curated import CHAMPIONS
+    fs = final_standings(ESPN_DIR)
+    # every season's place-1 owner is exactly the curated champion
+    for year, rec in CHAMPIONS.items():
+        winners = [o for o, years in fs.items() if years.get(year) == 1]
+        assert winners == [rec["champion"]], f"{year}: {winners}"
+    # Walter's best final placement is 1; every owner has >= 1 season recorded
+    assert min(fs["Walter"].values()) == 1
+    assert len(fs) == 15
+
+
 def test_bench_records(lineups):
     br = lineups["bench_records"]
     assert len(br) >= 5

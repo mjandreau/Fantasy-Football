@@ -146,6 +146,19 @@ def build_lineups(espn_dir):
             "all_time_teams": all_time_teams(espn_dir)}
 
 
+def final_standings(espn_dir):
+    """owner -> {year: final post-playoff placement} from the ESPN cache.
+    Validated against the curated champions (place 1 == champion, all years)."""
+    out = defaultdict(dict)
+    for lg_path in sorted(Path(espn_dir).glob("league_*.json")):
+        league = json.loads(lg_path.read_text())
+        for t in league["teams"]:
+            place = t.get("final_standing")
+            if place:
+                out[owner_for_team(t)][str(league["year"])] = place
+    return dict(out)
+
+
 # Best-ever lineup slots per owner (points scored while on their roster).
 # Mirrors the league's actual lineup: offense + D/ST + one DL/LB/DB (IDP).
 _TEAM_SLOTS = [("QB", {"QB"}), ("RB1", {"RB"}), ("RB2", {"RB"}),
