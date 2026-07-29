@@ -639,19 +639,30 @@ function el(tag, attrs={}, ...kids){
   return n;
 }
 
-function renderTable(container, columns, rows){
+// opts.pinBottom: rows matching this predicate are pinned below the table,
+// excluded from sorting, and skipped by position numbering.
+// A column with {position:true} shows the row's current display position
+// (renumbers on every re-sort); it is not itself sortable.
+function renderTable(container, columns, rows, opts={}){
   container.innerHTML="";
   const table=el("table",{class:"data-table"});
   const thead=el("thead"); const htr=el("tr");
   let sortKey=null, sortDir=-1;
   columns.forEach(c=>{
-    const th=el("th",{onclick:()=>{ sortKey=c.key; sortDir=-sortDir; draw(); }}, c.label);
+    const th = c.position
+      ? el("th",{style:"cursor:default"}, c.label)
+      : el("th",{onclick:()=>{ sortKey=c.key; sortDir=-sortDir; draw(); }}, c.label);
     htr.append(th);
   });
   thead.append(htr); table.append(thead);
   const tbody=el("tbody"); table.append(tbody); container.append(table);
   function draw(){
-    const data=[...rows];
+    let main=rows, pinned=[];
+    if(opts.pinBottom){
+      main=rows.filter(r=>!opts.pinBottom(r));
+      pinned=rows.filter(r=>opts.pinBottom(r));
+    }
+    const data=[...main];
     if(sortKey) data.sort((a,b)=>{
       const x=a[sortKey], y=b[sortKey];
       if(x==null && y==null) return 0;
@@ -660,9 +671,16 @@ function renderTable(container, columns, rows){
       return (x>y?1:x<y?-1:0)*sortDir;
     });
     tbody.innerHTML="";
-    data.forEach(r=>{
-      const tr=el("tr");
-      columns.forEach(c=>tr.append(el("td",{html:c.fmt?c.fmt(r[c.key],r):String(r[c.key]??"")})));
+    [...data, ...pinned].forEach((r,i)=>{
+      const isPinned = i >= data.length;
+      const tr=el("tr", isPinned?{style:"opacity:.55"}:{});
+      columns.forEach(c=>{
+        if(c.position){
+          tr.append(el("td",{}, isPinned ? "—" : String(i+1)));
+        } else {
+          tr.append(el("td",{html:c.fmt?c.fmt(r[c.key],r):String(r[c.key]??"")}));
+        }
+      });
       tbody.append(tr);
     });
   }
@@ -781,8 +799,8 @@ RENDERERS.rankings = function(){
   const root=document.getElementById("tab-rankings"); root.innerHTML="";
   const card=el("div",{class:"card"},
     el("div",{class:"card-title"},"🏈 All-Time Standings (Regular Season)"),
-    el("div",{class:"card-note"},"Power Rank requires ≥ 40 games (~3 seasons); "+
-      "owners below that (historical short-timers) are shown unranked (—) at the bottom."));
+    el("div",{class:"card-note"},"Click a column to sort — the # renumbers with the sort. "+
+      "Departed owners (2011–14 era) stay pinned at the bottom, outside the sort."));
   const wrap=el("div",{class:"table-scroll"}); card.append(wrap); root.append(card);
   const crownMap=Object.fromEntries(((ANALYTICS.crowns||{}).all_time||[]).map(c=>[c.owner,c.crowns]));
   const rows=DATA.all_time_standings.map(r=>({...r,
@@ -790,7 +808,7 @@ RENDERERS.rankings = function(){
      crowns: crownMap[r.owner]||0,
      titles:(DATA.owner_careers[r.owner]?.titles||[]).length}));
   renderTable(wrap,
-    [{key:"power_rank",label:"#",fmt:v=>v==null?"—":v},
+    [{position:true,label:"#"},
      {key:"owner_label",label:"Team"},
      {key:"wins",label:"W"},{key:"losses",label:"L"},{key:"ties",label:"T"},
      {key:"games",label:"G"},
@@ -801,7 +819,8 @@ RENDERERS.rankings = function(){
      {key:"power_index",label:"P-Idx",fmt:v=>v.toFixed(2)},
      {key:"crowns",label:"👑"},
      {key:"titles",label:"🏆"}],
-    rows);
+    rows,
+    {pinBottom: r=>!isActive(r.owner)});
   const chartCard=el("div",{class:"card"}, el("div",{class:"card-title"},"Power Index (all owners)"));
   const cw=el("div",{class:"chart-wrap"}); const canvas=el("canvas"); cw.append(canvas);
   chartCard.append(cw); root.append(chartCard);
