@@ -2,6 +2,7 @@ from build.games import build_games, season_team_names
 from build.loaders import parse_gridiron
 from build.reconcile import flag_conflicts, reconciliation_report
 from build.metrics import standings, head_to_head, record_book, owner_careers
+from build.analytics import build_analytics, build_insights
 from build.curated import CHAMPIONS, validate_curated
 from build.normalize import ALL_TIME_OWNERS, ACTIVE_OWNERS
 
@@ -26,5 +27,7 @@ def assemble(history_path, gridiron_path, generated):
         "head_to_head": head_to_head(games),
         "record_book": record_book(games),
         "owner_careers": owner_careers(games, CHAMPIONS),
+        "analytics": build_analytics(games),
+        "insights": build_insights(games),
     }
     return data, report
