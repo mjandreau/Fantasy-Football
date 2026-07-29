@@ -838,7 +838,16 @@ RENDERERS.owner = function(){
   sel.addEventListener("change",()=>draw(sel.value)); draw(OWNERS[0]);
 };
 
-window.addEventListener("DOMContentLoaded",()=>{ switchTab("overview"); });
+window.addEventListener("DOMContentLoaded",()=>{
+  try { switchTab("overview"); }
+  catch(err){
+    console.error("Dashboard render error:", err);
+    const o=document.getElementById("tab-overview");
+    if(o) o.innerHTML='<div class="card"><div class="card-title">⚠️ Dashboard failed to render</div>'
+      +'<div class="card-note">'+String((err&&err.message)||err)+'</div>'
+      +'<div class="card-note">Please copy this message and send it over so it can be fixed.</div></div>';
+  }
+});
 </script>
 
 <script>
