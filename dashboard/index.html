@@ -868,6 +868,22 @@ RENDERERS.rankings = function(){
     datasets:[{label:"Power Index",data:sorted.map(r=>r.power_index),
       backgroundColor:sorted.map(r=>OWNER_COLORS[r.owner])}]},
     options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}});
+  // Average finish by owner (lower = better)
+  const afCard=el("div",{class:"card"},
+    el("div",{class:"card-title"},"🎯 Average Finish by Owner"),
+    el("div",{class:"card-note"},"Career average regular-season finish — shorter bar is better."));
+  const afw=el("div",{class:"chart-wrap"}); const afCanvas=el("canvas");
+  afw.append(afCanvas); afCard.append(afw); root.append(afCard);
+  const afRows=rows.filter(r=>r.avg_finish!=null&&isActive(r.owner))
+    .sort((x,y)=>x.avg_finish-y.avg_finish);
+  new Chart(afCanvas,{type:"bar",
+    data:{labels:afRows.map(r=>r.owner),
+      datasets:[{label:"Avg finish",data:afRows.map(r=>r.avg_finish),
+        backgroundColor:afRows.map(r=>OWNER_COLORS[r.owner]),borderRadius:4}]},
+    options:{plugins:{legend:{display:false},
+        tooltip:{callbacks:{label:c=>` avg finish ${c.parsed.y.toFixed(1)}`}}},
+      scales:{y:{beginAtZero:true,title:{display:true,text:"Avg finish (lower = better)"}}}}});
+
   // Career chips: longest win streaks
   const streakCard=el("div",{class:"card"}, el("div",{class:"card-title"},"🔥 Longest Win Streaks"));
   const chipRow=el("div");
@@ -1326,6 +1342,33 @@ RENDERERS.analytics = function(){
           const r=ap.find(x=>x.owner===c.dataset.label);
           return r?`${r.owner}: ${r.actual_wins} actual vs ${r.expected_wins} deserved (luck ${r.luck>0?"+":""}${r.luck})`:c.dataset.label;
         }}}}}});
+
+  // Cumulative luck over time: running total of (actual - deserved) wins
+  const bySeason=(ANALYTICS.all_play||{}).by_season||{};
+  const seasons=DATA.meta.seasons;
+  const clCard=el("div",{class:"card"},
+    el("div",{class:"card-title"},"🎲 Cumulative Luck — career running total"),
+    el("div",{class:"card-note"},"Running sum of actual minus deserved wins, season by season. "+
+      "Above zero = the schedule has blessed them; below = a career of robbery. "+
+      "Click legend names to show or hide owners."));
+  const clw=el("div",{class:"chart-wrap",style:"height:400px"}); const clCanvas=el("canvas");
+  clw.append(clCanvas); clCard.append(clw); root.append(clCard);
+  const clDatasets=OWNERS.map(o=>{
+    let cum=0, started=false;
+    const data=seasons.map(y=>{
+      const row=(bySeason[String(y)]||[]).find(r=>r.owner===o);
+      if(row){ started=true; cum+=row.luck; return Math.round(cum*100)/100; }
+      return started&&isActive(o)?cum:null;   // departed owners' lines end
+    });
+    return {label:o,data,borderColor:OWNER_COLORS[o],backgroundColor:OWNER_COLORS[o],
+      borderWidth:2,pointRadius:2,pointHoverRadius:6,tension:0.2,spanGaps:false,
+      hidden:!isActive(o)};
+  });
+  new Chart(clCanvas,{type:"line",
+    data:{labels:seasons,datasets:clDatasets},
+    options:{maintainAspectRatio:false,interaction:{mode:"nearest",intersect:false},
+      scales:{y:{title:{display:true,text:"Cumulative luck (wins)"}}},
+      plugins:{legend:{position:"bottom",labels:{boxWidth:10,usePointStyle:true}}}}});
 
   // Boom/bust: weekly volatility
   const cons=((ANALYTICS.consistency||{}).all_time||[]).filter(r=>r.games>=40);
