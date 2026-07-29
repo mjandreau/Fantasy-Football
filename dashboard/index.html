@@ -825,13 +825,23 @@ RENDERERS.rankings = function(){
   const card=el("div",{class:"card"},
     el("div",{class:"card-title"},"🏈 All-Time Standings (Regular Season)"),
     el("div",{class:"card-note"},"Click a column to sort — the # renumbers with the sort. "+
-      "Departed owners (2011–14 era) stay pinned at the bottom, outside the sort."));
+      "Departed owners (2011–14 era) stay pinned at the bottom, outside the sort. "+
+      "Finish columns are regular-season power rank (a 🥇 best finish without a 🏆 means "+
+      "they topped the regular season but lost the bracket)."));
   const wrap=el("div",{class:"table-scroll"}); card.append(wrap); root.append(card);
   const crownMap=Object.fromEntries(((ANALYTICS.crowns||{}).all_time||[]).map(c=>[c.owner,c.crowns]));
-  const rows=DATA.all_time_standings.map(r=>({...r,
+  const rows=DATA.all_time_standings.map(r=>{
+    const seasons=(DATA.owner_careers[r.owner]?.seasons||[]);
+    const ranks=seasons.map(s=>s.rank).filter(x=>x!=null);
+    return {...r,
      owner_label: isActive(r.owner) ? r.owner : r.owner + " (inactive)",
      crowns: crownMap[r.owner]||0,
-     titles:(DATA.owner_careers[r.owner]?.titles||[]).length}));
+     avg_finish: ranks.length ? ranks.reduce((a,b)=>a+b,0)/ranks.length : null,
+     top3: ranks.filter(x=>x<=3).length,
+     best_finish: ranks.length ? Math.min(...ranks) : null,
+     worst_finish: ranks.length ? Math.max(...ranks) : null,
+     titles:(DATA.owner_careers[r.owner]?.titles||[]).length};
+  });
   renderTable(wrap,
     [{position:true,label:"#"},
      {key:"owner_label",label:"Team"},
@@ -842,8 +852,12 @@ RENDERERS.rankings = function(){
      {key:"pa",label:"PA",fmt:v=>v.toFixed(0)},
      {key:"avg_score",label:"Avg",fmt:v=>v.toFixed(1)},
      {key:"power_index",label:"P-Idx",fmt:v=>v.toFixed(2)},
+     {key:"avg_finish",label:"Avg Fin",fmt:v=>v==null?"—":v.toFixed(1)},
+     {key:"top3",label:"Top 3s"},
+     {key:"best_finish",label:"Best",fmt:v=>v==null?"—":(v===1?"🥇":v)},
+     {key:"worst_finish",label:"Worst",fmt:v=>v==null?"—":v},
      {key:"crowns",label:"👑"},
-     {key:"titles",label:"🏆"}],
+     {key:"titles",label:"Titles",fmt:v=>v?"🏆".repeat(v):"—"}],
     rows,
     {pinBottom: r=>!isActive(r.owner)});
   const chartCard=el("div",{class:"card"}, el("div",{class:"card-title"},"Power Index (all owners)"));
