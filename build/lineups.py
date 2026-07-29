@@ -27,7 +27,7 @@ _ELIGIBLE = {
 }
 
 
-def _owner_for_team(team):
+def owner_for_team(team):
     """Map an ESPN team's owner list to a short owner name."""
     for o in team.get("owners", []):
         first = (o.get("first") or "").strip()
@@ -82,7 +82,7 @@ def build_lineups(espn_dir):
     for bs_path in sorted(espn_dir.glob("boxscores_*.json")):
         year = int(bs_path.stem.split("_")[1])
         league = json.loads((espn_dir / f"league_{year}.json").read_text())
-        owner_by_id = {t["team_id"]: _owner_for_team(t) for t in league["teams"]}
+        owner_by_id = {t["team_id"]: owner_for_team(t) for t in league["teams"]}
         max_week = (league.get("reg_season_weeks") or 14) + 3
         data = json.loads(bs_path.read_text())
         for wk, matchups in data["weeks"].items():
