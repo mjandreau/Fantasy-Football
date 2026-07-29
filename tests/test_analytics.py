@@ -117,6 +117,16 @@ def test_build_insights(games):
     assert "overview" in tabs and "analytics" in tabs
 
 
+def test_insights_active_owners_only(games):
+    # Superlative insights never award a departed 2011-14 owner
+    from build.normalize import HISTORICAL_OWNERS
+    ins = build_insights(games)
+    for i in ins:
+        for h in HISTORICAL_OWNERS:
+            assert i["tab"] != f"owner:{h}", f"insight targets inactive owner: {i}"
+            assert h not in i["title"], f"insight titles inactive owner: {i}"
+
+
 def test_build_analytics_bundle(games):
     import json
     a = build_analytics(games)

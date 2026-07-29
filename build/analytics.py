@@ -216,12 +216,16 @@ def _mk(id_, tab, icon, title, text):
 
 def build_insights(games):
     """Deterministic computed findings. Owner-specific findings are also
-    duplicated onto that owner's deep-dive tab (tab = 'owner:<name>')."""
+    duplicated onto that owner's deep-dive tab (tab = 'owner:<name>').
+    Superlatives consider ACTIVE owners only — short-tenure departed owners
+    (2011-14 era) would otherwise dominate small-sample awards."""
+    from build.normalize import ACTIVE_OWNERS
+    active = set(ACTIVE_OWNERS)
     ap = all_play(games)
     cons = consistency(games)
     cr = weekly_crowns(games)
-    st = streaks(games)
-    pr = playoff_records(games)
+    st = [r for r in streaks(games) if r["owner"] in active]
+    pr = [r for r in playoff_records(games) if r["owner"] in active]
     tr = season_trends(games)
 
     ins = []
@@ -240,9 +244,9 @@ def build_insights(games):
         f"{top_owner} owns a league-best {len(top_years)} championships "
         f"({', '.join(sorted(top_years))}).", owner=top_owner)
 
-    # Luckiest / unluckiest single seasons (min 10 games)
+    # Luckiest / unluckiest single seasons (min 10 games, active owners)
     season_rows = [(s, r) for s, rows in ap["by_season"].items()
-                   for r in rows if r["games"] >= 10]
+                   for r in rows if r["games"] >= 10 and r["owner"] in active]
     lucky_s, lucky = max(season_rows, key=lambda x: x[1]["luck"])
     unlucky_s, unlucky = min(season_rows, key=lambda x: x[1]["luck"])
     add("lucky-season", "overview", "🍀",
@@ -256,8 +260,8 @@ def build_insights(games):
         f"in {unlucky_s} but the schedule handed them just {unlucky['actual_wins']:g} "
         f"({unlucky['luck']:g} luck).", owner=unlucky["owner"])
 
-    # Boom/bust and steadiest (min 40 games)
-    vol = [r for r in cons["all_time"] if r["games"] >= 40]
+    # Boom/bust and steadiest (min 40 games, active owners)
+    vol = [r for r in cons["all_time"] if r["games"] >= 40 and r["owner"] in active]
     boom = max(vol, key=lambda r: r["stdev"])
     steady = min(vol, key=lambda r: r["stdev"])
     add("boom-bust", "analytics", "🎢", f"{boom['owner']} is the rollercoaster",
@@ -267,8 +271,8 @@ def build_insights(games):
         f"Steadiest scorer in league history: just ±{steady['stdev']:g} points of "
         f"weekly variation on a {steady['avg']:g} average.", owner=steady["owner"])
 
-    # Crown king
-    ck = cr["all_time"][0]
+    # Crown king (active owners)
+    ck = next(r for r in cr["all_time"] if r["owner"] in active)
     add("crown-king", "overview", "👑", f"Weekly crown king: {ck['owner']}",
         f"{ck['owner']} has posted the league's top weekly score {ck['crowns']} times "
         "— more than anyone else.", owner=ck["owner"])
@@ -294,10 +298,10 @@ def build_insights(games):
             f"season to {choker['playoff_win_pct']:.0%} when the bracket starts.",
             owner=choker["owner"])
 
-    # Heartbreak: most losses by < 5
+    # Heartbreak: most losses by < 5 (active owners)
     hb = defaultdict(int)
     for g in games:
-        if not g["tie"] and g["margin"] < 5:
+        if not g["tie"] and g["margin"] < 5 and g["loser"] in active:
             hb[g["loser"]] += 1
     if hb:
         hb_owner, hb_n = max(hb.items(), key=lambda kv: kv[1])
