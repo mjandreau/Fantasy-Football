@@ -365,6 +365,7 @@
   .season-select:hover{ border-color:var(--green); }
   .season-select:focus{ outline:none; border-color:var(--green-bright); box-shadow:0 0 0 2px var(--accent-soft); }
   .season-select option{ background:var(--surface-2); color:var(--text); }
+  .season-select{ margin-right:0.5rem; vertical-align:middle; }
 
   /* ---------- Pills / badges ---------- */
   .pill{
@@ -708,6 +709,40 @@ RENDERERS.season = function(){
   }
   select.addEventListener("change",()=>draw(Number(select.value)));
   draw(seasons[0]);
+};
+
+RENDERERS.h2h = function(){
+  const root=document.getElementById("tab-h2h"); root.innerHTML="";
+  const mk=()=>{ const s=el("select",{class:"season-select"});
+    OWNERS.forEach(o=>s.append(el("option",{value:o},o))); return s; };
+  const a=mk(), b=mk(); b.selectedIndex=1;
+  root.append(el("div",{class:"card"}, el("div",{class:"card-title"},"Pick Two Teams"),
+    a, el("span",{}," vs "), b));
+  const out=el("div"); root.append(out);
+  function draw(){
+    out.innerHTML="";
+    const o1=a.value, o2=b.value;
+    if(o1===o2){ out.append(el("div",{class:"card"},"Pick two different owners.")); return; }
+    const [x,y]=[o1,o2].sort();
+    const rec=DATA.head_to_head[`${x}|${y}`];
+    if(!rec){ out.append(el("div",{class:"card"},"No meetings on record.")); return; }
+    const o1w = o1===x?rec.a_wins:rec.b_wins;
+    const o2w = o2===x?rec.a_wins:rec.b_wins;
+    const card=el("div",{class:"card"}, el("div",{class:"card-title"},`${o1} vs ${o2}`),
+      el("div",{}, `Record: ${o1} ${o1w} — ${o2w} ${o2}  (${rec.ties} ties, ${rec.games} games)`),
+      el("div",{}, `Avg: ${o1} ${(o1===x?rec.a_avg:rec.b_avg).toFixed(1)} — `+
+                   `${(o2===x?rec.a_avg:rec.b_avg).toFixed(1)} ${o2}`));
+    out.append(card);
+    const hist=el("div",{class:"card"}, el("div",{class:"card-title"},"Every Meeting"));
+    const wrap=el("div",{class:"table-scroll"}); hist.append(wrap); out.append(hist);
+    const rows=[...rec.meetings].reverse().map(m=>({
+      season:m.season, week:m.week, phase:m.phase,
+      score:`${(o1===x?m.a_score:m.b_score)}–${(o2===x?m.a_score:m.b_score)}`,
+      winner:m.winner||"TIE"}));
+    renderTable(wrap,[{key:"season",label:"Year"},{key:"week",label:"Wk"},
+      {key:"phase",label:"Phase"},{key:"score",label:`${o1}–${o2}`},{key:"winner",label:"Winner"}],rows);
+  }
+  a.addEventListener("change",draw); b.addEventListener("change",draw); draw();
 };
 
 // header stats + first tab
