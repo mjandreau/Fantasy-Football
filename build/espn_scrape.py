@@ -5,9 +5,13 @@ and the full draft. For 2019+ also pulls player-level box scores for every
 matchup period. Everything lands in data/espn/ (gitignored). Resumable:
 existing files are skipped; pass --force to refetch.
 
-Usage: python -m build.espn_scrape [--force]
+Usage:
+  python -m build.espn_scrape                  # fetch anything not yet cached
+  python -m build.espn_scrape --refresh 2026   # refetch ONE year (in-season use)
+  python -m build.espn_scrape --force          # refetch everything
 """
 
+import datetime
 import json
 import sys
 import time
@@ -18,8 +22,10 @@ from espn_api.football import League
 ROOT = Path(__file__).resolve().parent.parent
 CREDS = ROOT / "data" / "espn_credentials.json"
 OUT = ROOT / "data" / "espn"
-YEARS = range(2011, 2026)
-BOX_SCORE_YEARS = range(2019, 2026)   # ESPN serves player-level data 2019+
+# Through the current NFL season (a not-yet-created season fails gracefully).
+_END = datetime.date.today().year + 1
+YEARS = range(2011, _END)
+BOX_SCORE_YEARS = range(2019, _END)   # ESPN serves player-level data 2019+
 SLEEP = 0.4                           # be polite between requests
 
 
@@ -178,6 +184,14 @@ def main():
     force = "--force" in sys.argv
     creds = json.loads(CREDS.read_text())
     OUT.mkdir(parents=True, exist_ok=True)
+    # --refresh YEAR: drop that year's cache so it refetches (weekly in-season use)
+    if "--refresh" in sys.argv:
+        year = sys.argv[sys.argv.index("--refresh") + 1]
+        dropped = 0
+        for f in OUT.glob(f"*_{year}.json"):
+            f.unlink()
+            dropped += 1
+        print(f"--refresh {year}: dropped {dropped} cached file(s)")
     summary = []
     for year in YEARS:
         lg_path = OUT / f"league_{year}.json"

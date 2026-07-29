@@ -20,6 +20,9 @@ def build_moves(espn_dir):
     for lg_path in sorted(espn_dir.glob("league_*.json")):
         league = json.loads(lg_path.read_text())
         year = league["year"]
+        if not any((t.get("wins") or 0) + (t.get("losses") or 0)
+                   for t in league["teams"]):
+            continue   # rolled-over season shell (no games played yet)
         for t in league["teams"]:
             owner = owner_for_team(t)
             adds = t.get("acquisitions") or 0

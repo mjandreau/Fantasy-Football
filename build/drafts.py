@@ -71,6 +71,8 @@ def build_drafts(espn_dir):
     for lg_path in sorted(espn_dir.glob("league_*.json")):
         year = int(lg_path.stem.split("_")[1])
         league = json.loads(lg_path.read_text())
+        if not league["draft"]:
+            continue   # rolled-over season shell (no draft held yet)
         owner_by_id = {t["team_id"]: owner_for_team(t) for t in league["teams"]}
         n_teams = len(league["teams"])
         season_meta = _season_meta(espn_dir, year)
