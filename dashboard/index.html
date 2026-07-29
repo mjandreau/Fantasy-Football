@@ -347,6 +347,25 @@
   table.data-table tbody tr:nth-child(even){ background:rgba(255,255,255,0.015); }
   table.data-table tbody tr:hover{ background:var(--green-deep); }
 
+  /* ---------- Controls ---------- */
+  .season-select{
+    appearance:none;
+    -webkit-appearance:none;
+    background:var(--surface-2) url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6'><path d='M0 0l5 6 5-6z' fill='%2396a89e'/></svg>") no-repeat right 0.85rem center;
+    color:var(--text);
+    border:1px solid var(--border-strong);
+    border-radius:var(--radius-sm);
+    padding:0.5rem 2.2rem 0.5rem 0.9rem;
+    font-family:var(--font-display);
+    font-size:0.85rem;
+    letter-spacing:0.03em;
+    cursor:pointer;
+    min-width:8rem;
+  }
+  .season-select:hover{ border-color:var(--green); }
+  .season-select:focus{ outline:none; border-color:var(--green-bright); box-shadow:0 0 0 2px var(--accent-soft); }
+  .season-select option{ background:var(--surface-2); color:var(--text); }
+
   /* ---------- Pills / badges ---------- */
   .pill{
     display:inline-flex;
@@ -648,6 +667,47 @@ RENDERERS.rankings = function(){
     datasets:[{label:"Power Index",data:sorted.map(r=>r.power_index),
       backgroundColor:sorted.map(r=>OWNER_COLORS[r.owner])}]},
     options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}});
+};
+
+RENDERERS.season = function(){
+  const root=document.getElementById("tab-season"); root.innerHTML="";
+  const seasons=[...DATA.meta.seasons].reverse();
+  const select=el("select",{class:"season-select"});
+  seasons.forEach(y=>select.append(el("option",{value:y},y)));
+  root.append(el("div",{class:"card"}, el("div",{class:"card-title"},"Select Season"), select));
+  const body=el("div"); root.append(body);
+  function draw(y){
+    body.innerHTML="";
+    const champ=DATA.champions[String(y)];
+    const names=DATA.team_names[String(y)]||{};
+    const head=el("div",{class:"card"},
+      el("div",{class:"card-title"},`${y} Season`),
+      el("div",{}, `🏆 Champion: ${champ.champion} (${names[champ.champion]||""})`),
+      el("div",{}, `💩 Last place: ${champ.last_place} (${names[champ.last_place]||""})`));
+    body.append(head);
+    const card=el("div",{class:"card"}, el("div",{class:"card-title"},"Final Standings"));
+    const wrap=el("div",{class:"table-scroll"}); card.append(wrap); body.append(card);
+    const rows=DATA.season_standings[String(y)].map(r=>({...r, team:names[r.owner]||""}));
+    renderTable(wrap,
+      [{key:"power_rank",label:"#"},{key:"owner",label:"Owner"},{key:"team",label:"Team"},
+       {key:"wins",label:"W"},{key:"losses",label:"L"},{key:"ties",label:"T"},
+       {key:"pf",label:"PF",fmt:v=>v.toFixed(0)},
+       {key:"avg_score",label:"Avg",fmt:v=>v.toFixed(1)},
+       {key:"power_index",label:"P-Idx",fmt:v=>v.toFixed(2)}],
+      rows);
+    // playoff results
+    const ply=DATA.games.filter(g=>g.season===y&&g.phase==="playoff")
+      .sort((a,b)=>a.playoff_round-b.playoff_round);
+    if(ply.length){
+      const pc=el("div",{class:"card"}, el("div",{class:"card-title"},"Playoff Results"));
+      ply.forEach(g=>pc.append(el("div",{},
+        `R${g.playoff_round}: ${g.winner} def. ${g.loser} — `+
+        `${Math.max(g.home_score,g.away_score)}–${Math.min(g.home_score,g.away_score)}`)));
+      body.append(pc);
+    }
+  }
+  select.addEventListener("change",()=>draw(Number(select.value)));
+  draw(seasons[0]);
 };
 
 // header stats + first tab
