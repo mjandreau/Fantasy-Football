@@ -475,6 +475,20 @@
 .hm td{ width:34px; height:28px; text-align:center; border:2px solid var(--bg); border-radius:4px; font-weight:700; cursor:pointer; }
 .hm td.hm-empty{ background:var(--surface); color:var(--border); cursor:default; }
 .hm td:hover:not(.hm-empty){ outline:2px solid var(--accent); }
+.bracket{ display:grid; grid-template-columns:repeat(3,minmax(190px,1fr)); gap:16px; align-items:stretch; }
+.bk-col{ display:flex; flex-direction:column; }
+.bk-col-title{ font-size:.7rem; text-transform:uppercase; letter-spacing:.1em; color:var(--text-dim); text-align:center; margin-bottom:10px; }
+.bk-slots{ flex:1; display:flex; flex-direction:column; justify-content:space-around; gap:10px; }
+.bk-match{ background:var(--surface); border:1px solid var(--border); border-radius:8px; overflow:hidden; }
+.bk-team{ display:flex; justify-content:space-between; gap:10px; padding:7px 12px; font-size:.82rem; color:var(--text-dim); }
+.bk-team + .bk-team{ border-top:1px solid var(--border); }
+.bk-team .bk-score{ font-variant-numeric:tabular-nums; }
+.bk-adv{ color:var(--text); font-weight:700; background:var(--green-deep); }
+.bk-adv .bk-score{ color:var(--green-bright); }
+.bk-bye{ border-style:dashed; text-align:center; padding:10px; font-size:.78rem; color:var(--text-dim); }
+.bk-final-title{ text-align:center; font-size:.95rem; font-weight:700; color:var(--accent); margin-bottom:6px; }
+.bk-third{ margin-top:14px; }
+@media (max-width:760px){ .bracket{ grid-template-columns:1fr; } .bk-slots{ gap:8px; } }
 .subnav{ display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px; }
 .subnav-btn{ background:var(--surface); border:1px solid var(--border); color:var(--text-dim); border-radius:999px; padding:6px 14px; font-size:.78rem; font-weight:600; cursor:pointer; transition:all .15s; }
 .subnav-btn:hover{ color:var(--text); border-color:var(--green-bright); }
@@ -894,15 +908,84 @@ RENDERERS.season = function(){
          {key:"luck",label:"Luck",fmt:v=>(v>0?"+":"")+v.toFixed(1)}],
         luckRows);
     }
-    // playoff results
+    // Playoff bracket, reconstructed by tracing back from the champion:
+    // their R3 game is the final, R2 the semis, R1 the quarters (or a bye).
+    // Highlighting marks the team that ADVANCED (handles the 2015 tie-on-seeding).
     const ply=DATA.games.filter(g=>g.season===y&&g.phase==="playoff")
       .sort((a,b)=>a.playoff_round-b.playoff_round);
     if(ply.length){
-      const pc=el("div",{class:"card"}, el("div",{class:"card-title"},"Playoff Results"));
-      ply.forEach(g=>pc.append(el("div",{},
-        `R${g.playoff_round}: ${g.winner} def. ${g.loser} — `+
-        `${Math.max(g.home_score,g.away_score)}–${Math.min(g.home_score,g.away_score)}`)));
-      body.append(pc);
+      const gof=(o,r)=>ply.find(g=>g.playoff_round===r&&(g.home_owner===o||g.away_owner===o));
+      const parts=g=>[g.home_owner,g.away_owner];
+      const matchCard=(g,advancer)=>{
+        const m=el("div",{class:"bk-match"});
+        [[g.home_owner,g.home_score],[g.away_owner,g.away_score]].forEach(([o,s])=>
+          m.append(el("div",{class:"bk-team"+(o===advancer?" bk-adv":"")},
+            el("span",{},o), el("span",{class:"bk-score"},s.toFixed(1)))));
+        return m;
+      };
+      const finalG = champ ? gof(champ.champion,3) : null;
+      if(finalG){
+        const runner = parts(finalG).find(o=>o!==champ.champion);
+        const semiA=gof(champ.champion,2), semiB=gof(runner,2);
+        const bkCard=el("div",{class:"card"},
+          el("div",{class:"card-title"},`🏆 ${y} Championship Bracket`));
+        const grid=el("div",{class:"bracket"});
+        const used=new Set([finalG,semiA,semiB].filter(Boolean));
+        // Round 1 column: each semifinalist's R1 game, or a bye
+        const semiFinalists=[...(semiA?parts(semiA):[]), ...(semiB?parts(semiB):[])];
+        const r1=el("div",{class:"bk-col"}, el("div",{class:"bk-col-title"},"Round 1"));
+        const r1slots=el("div",{class:"bk-slots"});
+        semiFinalists.forEach(o=>{
+          const gq=gof(o,1);
+          if(gq){ used.add(gq); r1slots.append(matchCard(gq,o)); }
+          else r1slots.append(el("div",{class:"bk-match bk-bye"},`${o} — first-round bye`));
+        });
+        r1.append(r1slots);
+        // Semifinals column
+        const sf=el("div",{class:"bk-col"}, el("div",{class:"bk-col-title"},"Semifinals"));
+        const sfslots=el("div",{class:"bk-slots"});
+        if(semiA) sfslots.append(matchCard(semiA,champ.champion));
+        if(semiB) sfslots.append(matchCard(semiB,runner));
+        sf.append(sfslots);
+        // Championship column (+ 3rd place if the semifinal losers met in R3)
+        const fin=el("div",{class:"bk-col"}, el("div",{class:"bk-col-title"},"Championship"));
+        const fslots=el("div",{class:"bk-slots"});
+        const fwrap=el("div",{},
+          el("div",{class:"bk-final-title"},`🏆 ${champ.champion} wins it all`),
+          matchCard(finalG,champ.champion));
+        const losers=[semiA,semiB].filter(Boolean)
+          .map(g=>parts(g).find(o=>o!==champ.champion&&o!==runner));
+        const thirdG=ply.find(g=>g.playoff_round===3&&
+          losers.length===2&&parts(g).every(o=>losers.includes(o)));
+        if(thirdG){ used.add(thirdG);
+          fwrap.append(el("div",{class:"bk-third"},
+            el("div",{class:"bk-col-title"},"🥉 Third Place"),
+            matchCard(thirdG,thirdG.winner||parts(thirdG)[0])));
+        }
+        fslots.append(fwrap); fin.append(fslots);
+        grid.append(r1,sf,fin); bkCard.append(grid); body.append(bkCard);
+        // Everything else that week: consolation / placement games, collapsed
+        const rest=ply.filter(g=>!used.has(g));
+        if(rest.length){
+          const det=el("details",{},
+            el("summary",{class:"subnav-btn",style:"display:inline-block;list-style:none"},
+              `Consolation & placement games (${rest.length}) ▾`));
+          const list=el("div",{style:"margin-top:8px"});
+          rest.forEach(g=>list.append(el("div",{class:"card-note"},
+            `R${g.playoff_round}: `+(g.tie
+              ? `${g.home_owner} tied ${g.away_owner} — ${g.home_score.toFixed(1)} apiece`
+              : `${g.winner} def. ${g.loser} — `+
+                `${Math.max(g.home_score,g.away_score).toFixed(1)}–${Math.min(g.home_score,g.away_score).toFixed(1)}`))));
+          det.append(list); bkCard.append(det);
+        }
+      } else {
+        // Fallback: flat list if the bracket can't be traced
+        const pc=el("div",{class:"card"}, el("div",{class:"card-title"},"Playoff Results"));
+        ply.forEach(g=>pc.append(el("div",{},
+          `R${g.playoff_round}: ${g.winner||"TIE"} ${g.winner?"def.":"-"} ${g.loser||""} — `+
+          `${Math.max(g.home_score,g.away_score)}–${Math.min(g.home_score,g.away_score)}`)));
+        body.append(pc);
+      }
     }
   }
   select.addEventListener("change",()=>draw(Number(select.value)));
