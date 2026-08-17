@@ -35,11 +35,22 @@
     --shadow-card: 0 10px 28px rgba(0,0,0,0.35);
     --font-display: 'Oswald', 'Arial Narrow', sans-serif;
     --font-body: 'Inter', system-ui, -apple-system, sans-serif;
-    --maxw: 1240px;
+    /* Full-bleed: the page uses the whole window and breathing room comes from
+       this one gutter, shared by header, yard line, nav, content and footer so
+       tab labels stay flush with the table edges. Wide tables were previously
+       squeezed into a 1240px column with dead space either side. */
+    --gutter: 1.5rem;
   }
 
   *, *::before, *::after{ box-sizing:border-box; }
-  html{ color-scheme: dark; }
+  /* Scrollbars in the dashboard palette rather than the browser's default
+     white-and-grey, which read as a bright seam against the dark field. */
+  html{ color-scheme: dark; scrollbar-width:thin; scrollbar-color:#34493f transparent; }
+  *::-webkit-scrollbar{ width:11px; height:11px; }
+  *::-webkit-scrollbar-track{ background:transparent; }
+  *::-webkit-scrollbar-thumb{ background:#34493f; border-radius:6px; }
+  *::-webkit-scrollbar-thumb:hover{ background:#4a6357; }
+  *::-webkit-scrollbar-corner{ background:transparent; }
   body{
     margin:0;
     background:
@@ -75,9 +86,8 @@
   }
   .header-inner{
     position:relative;
-    max-width:var(--maxw);
     margin:0 auto;
-    padding:2rem 1.5rem 1.75rem;
+    padding:2rem var(--gutter) 1.75rem;
     display:flex;
     flex-wrap:wrap;
     align-items:flex-end;
@@ -137,9 +147,8 @@
   /* ---------- Yard-line motif ---------- */
   .yard-line{
     position:relative;
-    max-width:var(--maxw);
     margin:0 auto;
-    padding:0.4rem 1.5rem 0.55rem;
+    padding:0.4rem var(--gutter) 0.55rem;
     border-bottom:1px dashed var(--border-strong);
   }
   .yard-line-labels{
@@ -163,9 +172,10 @@
     background:rgba(10,18,15,0.92);
     backdrop-filter: blur(6px);
     border-bottom:1px solid var(--border);
-    max-width:var(--maxw);
     margin:0 auto;
-    padding:0 1.5rem;
+    /* The button's own 0.9rem of padding makes up the rest of the gutter, so
+       the first tab's text lines up with the table edges below it. */
+    padding:0 calc(var(--gutter) - 0.9rem);
     scrollbar-width:thin;
   }
   .nav-btn{
@@ -193,9 +203,8 @@
 
   /* ---------- Content / cards ---------- */
   .content{
-    max-width:var(--maxw);
     margin:0 auto;
-    padding:1.75rem 1.5rem 4rem;
+    padding:1.75rem var(--gutter) 4rem;
   }
   .tab{ display:none; }
   .tab.active{ display:block; animation:fade-in .25s ease; }
@@ -432,9 +441,8 @@
 
   /* ---------- Footer ---------- */
   .footer{
-    max-width:var(--maxw);
     margin:0 auto;
-    padding:1.5rem;
+    padding:1.5rem var(--gutter);
     color:var(--text-faint);
     font-size:0.72rem;
     text-align:center;
@@ -447,13 +455,15 @@
   }
 
   @media (max-width:900px){
-    .header-inner{ flex-direction:column; align-items:flex-start; padding:1.5rem 1.25rem 1.25rem; }
+    /* Narrow the shared gutter rather than re-stating it per element. */
+    :root{ --gutter:1.25rem; }
+    .header-inner{ flex-direction:column; align-items:flex-start; padding:1.5rem var(--gutter) 1.25rem; }
     .scoreboard{ width:100%; }
     .score-cell{ flex:1 1 auto; min-width:0; }
     .yard-line-labels span:nth-child(even){ display:none; }
-    .nav{ padding:0 1.25rem; }
+    .nav{ padding:0 calc(var(--gutter) - 0.6rem); }
     .nav-btn{ font-size:0.74rem; padding:0.7rem 0.6rem 0.55rem; }
-    .content{ padding:1.25rem 1.25rem 3rem; }
+    .content{ padding:1.25rem var(--gutter) 3rem; }
     .card-grid{ grid-template-columns:1fr; }
     .chart-wrap{ height:260px; }
   }
