@@ -10,11 +10,20 @@ from build.drafts import build_drafts
 from build.moves import build_moves, build_waivers, build_left_on_waivers
 from build.curated import CHAMPIONS, validate_curated
 from build.normalize import ALL_TIME_OWNERS, ACTIVE_OWNERS
+from build.odds_data import build_odds
+from build.tie_repair import points_for_drift, repair_ties
 
 
 def assemble(history_path, gridiron_path, generated, espn_dir=None):
     validate_curated(ALL_TIME_OWNERS)
     games = build_games(history_path)
+    # The workbook's pre-2018 scores are rounded, which turns four decisive
+    # games into apparent ties. Repair them from ESPN before anything reads the
+    # results, so standings, the power index, head-to-head and the odds curves
+    # all work from the same corrected record.
+    tie_report = {"repaired": [], "notes": []}
+    if espn_dir and Path(espn_dir).exists() and list(Path(espn_dir).glob("league_*.json")):
+        games, tie_report = repair_ties(games, espn_dir)
     grid = parse_gridiron(gridiron_path)
     games = flag_conflicts(games, grid)
     report = reconciliation_report(games)
@@ -47,9 +56,13 @@ def assemble(history_path, gridiron_path, generated, espn_dir=None):
         data["moves"] = build_moves(espn_dir)
         data["waivers"] = {**build_waivers(espn_dir),
                            "left_on_waivers": build_left_on_waivers(espn_dir)}
+        data["odds"] = build_odds(games, espn_dir)
+        data["odds"]["tie_repairs"] = tie_report["repaired"]
+        data["odds"]["pf_drift"] = points_for_drift(games, espn_dir)
     else:
         data["drafts"] = None
         data["final_standings"] = None
         data["moves"] = None
         data["waivers"] = None
+        data["odds"] = None
     return data, report

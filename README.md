@@ -8,7 +8,7 @@ self-contained static dashboard.
 (GitHub Pages, deploy-from-branch, repo root; the root `index.html` redirects
 to `dashboard/`).
 
-## The dashboard — 10 tabs
+## The dashboard — 11 tabs
 
 `dashboard/index.html` is fully self-contained: all data is embedded as a JSON
 blob between `/*DATA_START*/…/*DATA_END*/` markers, so it opens locally or
@@ -26,21 +26,37 @@ hosts as a static file. Only Chart.js and web fonts load from CDNs.
    default) + any-two-owners rivalry detail
 6. **League Analytics** — skill-vs-schedule luck scatter, cumulative luck lines,
    boom/bust volatility, bracket DNA, **Moves vs Glory** (churn vs finish)
-7. **Lineup Lab** *(2019+)* — start/sit efficiency vs optimal lineups, Hall of
+7. **Playoff Odds** — week-by-week probability of making the playoffs for
+   every season, computed point-in-time (each week sees only what was known
+   then), with a full-hindsight overlay, exact clinch/elimination, and a
+   schedule-luck panel (actual vs all-play record)
+8. **Lineup Lab** *(2019+)* — start/sit efficiency vs optimal lineups, Hall of
    Blunders, biggest benched games, **Waiver Wire Hall of Fame**, best seasons
    left on waivers
-8. **Draft Room** — the two draft boards per year (main draft incl. K/D-ST;
+9. **Draft Room** — the two draft boards per year (main draft incl. K/D-ST;
    3-round defensive IDP draft), first-overall gallery, draft grades,
    steals & busts (value = pick slot vs points rank, within each draft)
-9. **Record Book** — sub-tabbed records: scores, blowouts, streaks, crowns…
-10. **Owner Deep Dive** — per-owner career, All-Time Team (best-ever player at
+10. **Record Book** — sub-tabbed records: scores, blowouts, streaks, crowns…
+11. **Owner Deep Dive** — per-owner career, All-Time Team (best-ever player at
     each of the 11 lineup slots), rivalry report, personal insights
 
 League format notes: 12 teams (10 in 2011–14; Chris Borea, Joe Kosich, and
 Tucker departed at the 2015 expansion and appear as pinned "inactive" owners).
 IDP-lite lineup (QB/2RB/2WR/TE/2 flex/K/D-ST/DL/LB/DB). Two drafts per year.
 Standings and Power Index are regular-season only, with a 40-game all-time
-qualifier.
+qualifier. Playoff seeding is record then points-for, and the playoff field has
+varied (8 spots 2011-13, 6 since; 13 or 14 regular weeks depending on year) —
+the build reads the format per season and never hardcodes it.
+
+**Workbook rounding, and the four repaired games.** The League Schedule History
+workbook stores pre-2018 scores rounded, so season points-for runs 3-5 points
+above ESPN's for 2013-2017 and four decisive games (2011 wk14, 2013 wk12,
+2014 wk5, 2017 wk7) were recorded as ties. ESPN reports no ties in any of those
+seasons, and in each case both owners' records differ from the workbook by
+exactly one win and one loss — so `build/tie_repair.py` restores the winner and
+then asserts every season's W-L-T matches ESPN exactly, failing the build if it
+does not. The lost half-point is not recoverable, so points-for stays slightly
+high for 2013-2017; it does not change any seed order.
 
 ## Data sources
 
@@ -106,4 +122,16 @@ spreadsheet only needs updating at season's end — or not at all.
 Specs and plans live in `docs/superpowers/`. Frontend changes are verified by
 executing the actual built `dashboard/index.html` in jsdom (all tabs must
 render with zero uncaught errors) — the data-marker bug taught us to test the
-real bytes, not an approximation.
+real bytes, not an approximation:
+
+```
+npm install jsdom
+node tests/frontend/check_dashboard.js dashboard/index.html
+```
+
+That harness also re-derives the Playoff Odds tab's numbers from the embedded
+payload, so a curve that silently disagrees with the engine fails the check.
+
+`python -m build.calibrate` refits the odds model and prints its reliability
+curve. Re-run it after adding a season and update `FITTED_LAMBDA` in
+`build/scoring.py` if it moves.

@@ -78,6 +78,29 @@ def player_blob(bp):
     }
 
 
+def schedule_blob(lg):
+    """Every regular-season matchup, including ones not yet played.
+
+    Completed games already reach the dashboard through the workbook, but an
+    in-progress season cannot be simulated without knowing who still plays whom.
+    Each team carries its own opponent list, so pairings appear twice; keying on
+    the sorted team-id pair per week de-duplicates without assuming home/away.
+    """
+    weeks = getattr(lg.settings, "reg_season_count", None) or 14
+    seen, out = set(), []
+    for team in lg.teams:
+        for i, opponent in enumerate(getattr(team, "schedule", []) or [], start=1):
+            if i > weeks or opponent is None:
+                continue
+            a, b = team.team_id, opponent.team_id
+            key = (i, min(a, b), max(a, b))
+            if key in seen:
+                continue
+            seen.add(key)
+            out.append({"week": i, "home_team_id": a, "away_team_id": b})
+    return sorted(out, key=lambda r: (r["week"], r["home_team_id"]))
+
+
 def scrape_league(lg, year):
     return {
         "year": year,
@@ -86,6 +109,7 @@ def scrape_league(lg, year):
         "playoff_teams": getattr(lg.settings, "playoff_team_count", None),
         "teams": [team_blob(t) for t in lg.teams],
         "draft": [draft_blob(p) for p in lg.draft],
+        "schedule": schedule_blob(lg),
     }
 
 

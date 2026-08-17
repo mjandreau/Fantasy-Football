@@ -7,7 +7,7 @@ ROOT = Path(__file__).resolve().parent.parent
 DATA = ROOT / "data"
 BUILD = ROOT / "build"
 DASHBOARD = ROOT / "dashboard" / "index.html"
-GENERATED = "2026-07-28"  # bump when rebuilding
+GENERATED = "2026-08-17"  # bump when rebuilding
 
 
 def main():
@@ -20,6 +20,13 @@ def main():
         inject_into_dashboard(data, DASHBOARD)
         print(f"Injected data into {DASHBOARD}")
     print(f"Wrote league_data.json ({data['meta']['total_games']} games) and reconciliation.md")
+    odds = data.get("odds")
+    if odds:
+        for fix in odds.get("tie_repairs", []):
+            print(f"  tie repaired: {fix['season']} wk{fix['week']} "
+                  f"{fix['winner']} beat {fix['loser']} (workbook had a tie)")
+        print(f"  playoff odds: {len(odds['seasons'])} seasons "
+              f"({odds['seasons'][0]}-{odds['seasons'][-1]})")
 
 
 if __name__ == "__main__":
