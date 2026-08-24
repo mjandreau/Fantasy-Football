@@ -12,6 +12,21 @@ from pathlib import Path
 
 from build.normalize import owner_from_manager
 
+
+def season_has_results(boxscores):
+    """True once at least one matchup in this season has actually been played.
+
+    The moment a draft happens, ESPN serves the whole upcoming season: real
+    rosters, real lineups, an 18-week schedule -- and every score 0.0. Counted
+    naively that becomes a phantom season at 100% lineup efficiency and pads
+    every owner's career game total, so anything reading box scores has to skip
+    it. `build_moves` makes the equivalent check against the league blob's
+    win-loss counters.
+    """
+    return any(m.get("home_score") or m.get("away_score")
+               for week in boxscores["weeks"].values() for m in week)
+
+
 # Slots that don't score
 _NON_STARTING = {"BE", "IR"}
 # Which positions may fill which slots
@@ -85,6 +100,8 @@ def build_lineups(espn_dir):
         owner_by_id = {t["team_id"]: owner_for_team(t) for t in league["teams"]}
         max_week = (league.get("reg_season_weeks") or 14) + 3
         data = json.loads(bs_path.read_text())
+        if not season_has_results(data):
+            continue   # drafted but not yet played
         for wk, matchups in data["weeks"].items():
             if int(wk) > max_week:
                 continue
@@ -179,6 +196,8 @@ def all_time_teams(espn_dir):
         owner_by_id = {t["team_id"]: owner_for_team(t) for t in league["teams"]}
         max_week = (league.get("reg_season_weeks") or 14) + 3
         data = json.loads(bs_path.read_text())
+        if not season_has_results(data):
+            continue   # drafted but not yet played
         counted = set()
         for wk, matchups in data["weeks"].items():
             if int(wk) > max_week:

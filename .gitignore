@@ -18,3 +18,7 @@ build/reconciliation.md
 data/espn_credentials.json
 *.docx
 data/espn/
+
+# Node (jsdom for the frontend harness; installed with --no-save)
+node_modules/
+package-lock.json

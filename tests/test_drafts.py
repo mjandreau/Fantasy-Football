@@ -14,8 +14,18 @@ def drafts():
     return build_drafts(ESPN_DIR)
 
 
+def _drafted_years():
+    """Seasons with a draft in the cache, read independently of build_drafts."""
+    import json
+    out = []
+    for path in ESPN_DIR.glob("league_*.json"):
+        if json.loads(path.read_text(encoding="utf-8"))["draft"]:
+            out.append(int(path.stem.split("_")[1]))
+    return sorted(out)
+
+
 def test_all_years_present(drafts):
-    assert sorted(int(y) for y in drafts["years"]) == list(range(2011, 2026))
+    assert sorted(int(y) for y in drafts["years"]) == _drafted_years()
     assert len(drafts["years"]["2025"]["picks"]) == 228
     assert len(drafts["years"]["2012"]["picks"]) == 200
     # overall pick numbers are 1..N contiguous
@@ -25,10 +35,11 @@ def test_all_years_present(drafts):
 
 def test_first_overall_gallery(drafts):
     fo = drafts["first_overall"]
-    assert len(fo) == 15
+    years = _drafted_years()
+    assert len(fo) == len(years)
     assert fo[0]["year"] == 2011 and fo[0]["player"] == "Michael Vick"
     assert fo[0]["owner"] == "Matt"
-    assert fo[-1]["year"] == 2025
+    assert fo[-1]["year"] == years[-1]
     # gallery is the OFFENSIVE #1; the defensive draft's #1 rides along
     for f in fo:
         assert f["def_player"]
@@ -71,3 +82,43 @@ def test_value_analysis(drafts):
     # busts = first four OFFENSIVE rounds of the offense draft
     assert all(b["side"] == "OFF" and b["overall"] <= 48 for b in busts)
     assert busts[0]["delta"] < -50           # an early pick that cratered
+
+
+def _unplayed_drafted_years():
+    """Seasons already drafted but with no game results yet -- the board should
+    show, but nothing that needs points should."""
+    import json
+    out = []
+    for path in ESPN_DIR.glob("league_*.json"):
+        year = path.stem.split("_")[1]
+        if not json.loads(path.read_text(encoding="utf-8"))["draft"]:
+            continue
+        bs = ESPN_DIR / f"boxscores_{year}.json"
+        if not bs.exists():
+            continue
+        blob = json.loads(bs.read_text(encoding="utf-8"))
+        if not any(m.get("home_score") or m.get("away_score")
+                   for week in blob["weeks"].values() for m in week):
+            out.append(int(year))
+    return sorted(out)
+
+
+def test_upcoming_draft_shows_a_board_but_no_scoring_analysis(drafts):
+    """Once the draft happens ESPN serves the season's box scores as real
+    lineups at zero points. The board is real and belongs on the tab; ranking
+    those zeros would manufacture steals, busts and draft grades out of noise."""
+    upcoming = _unplayed_drafted_years()
+    if not upcoming:
+        pytest.skip("no drafted-but-unplayed season in the cache")
+    for year in upcoming:
+        picks = drafts["years"][str(year)]["picks"]
+        assert picks, f"{year} board is missing"
+        assert all(p["points"] is None for p in picks), \
+            f"{year} picks carry point totals before a game has been played"
+        for bucket in ("steals", "busts"):
+            assert not [e for e in drafts["value"][bucket] if e["year"] == year], \
+                f"{year} produced {bucket} with no scoring"
+    # Draft grades must be built only from seasons that were actually played.
+    played_picks = sum(len(drafts["years"][y]["picks"]) for y in drafts["years"]
+                       if int(y) not in upcoming and int(y) >= 2019)
+    assert sum(g["picks"] for g in drafts["value"]["grades"]) <= played_picks

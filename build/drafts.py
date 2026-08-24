@@ -1,4 +1,4 @@
-"""Draft history from the ESPN cache: every pick 2011-2025, the first-overall
+"""Draft history from the ESPN cache: every pick 2011 onward, the first-overall
 gallery, and (2019+, where box scores exist) value analysis — steals, busts,
 and per-owner draft grades based on pick slot vs actual season production."""
 
@@ -6,7 +6,7 @@ import json
 from collections import defaultdict
 from pathlib import Path
 
-from build.lineups import owner_for_team
+from build.lineups import owner_for_team, season_has_results
 
 # The league runs two separate drafts each year. The main ("offensive") draft
 # includes K and team D/ST; the defensive draft is individual defenders only
@@ -39,11 +39,16 @@ def _season_points(espn_dir, year):
     path = Path(espn_dir) / f"boxscores_{year}.json"
     if not path.exists():
         return None
+    data = json.loads(path.read_text())
+    if not season_has_results(data):
+        # Drafted but not yet played: ESPN already serves the rosters, all at
+        # zero. Ranking those zeros would invent steals, busts and grades, so
+        # this reads like a pre-2019 season -- board yes, value analysis no.
+        return None
     league = json.loads((Path(espn_dir) / f"league_{year}.json").read_text())
     max_week = (league.get("reg_season_weeks") or 14) + 3
     totals = defaultdict(float)
     counted = set()   # (player, week) — avoid double-counting repeated matchups
-    data = json.loads(path.read_text())
     for wk, matchups in data["weeks"].items():
         if int(wk) > max_week:
             continue
