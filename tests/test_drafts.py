@@ -122,3 +122,26 @@ def test_upcoming_draft_shows_a_board_but_no_scoring_analysis(drafts):
     played_picks = sum(len(drafts["years"][y]["picks"]) for y in drafts["years"]
                        if int(y) not in upcoming and int(y) >= 2019)
     assert sum(g["picks"] for g in drafts["value"]["grades"]) <= played_picks
+
+
+def test_kickers_are_never_defensive_picks(drafts):
+    """ESPN serves kickers as 'PK' about as often as 'K'. A kicker on the
+    defensive side corrupts the two-draft split and every side_overall rank
+    derived from it -- including which player headlines the IDP draft."""
+    for year, blob in drafts["years"].items():
+        for p in blob["picks"]:
+            if p["pos"] in ("K", "PK"):
+                assert p["side"] == "OFF", \
+                    f"{year} R{p['round']}.{p['pick']} {p['player']} ({p['pos']}) is on DEF"
+
+
+def test_defensive_draft_is_three_rounds_where_positions_resolve(drafts):
+    """The league runs a 3-round IDP draft. From 2019 on ESPN still serves
+    position metadata for everyone drafted, so the split must come out exact.
+    Earlier years include players ESPN no longer resolves at all."""
+    for year, blob in drafts["years"].items():
+        if int(year) < 2019:
+            continue
+        n_def = sum(1 for p in blob["picks"] if p["side"] == "DEF")
+        assert n_def == 3 * blob["teams"], \
+            f"{year}: {n_def} defensive picks, expected {3 * blob['teams']}"

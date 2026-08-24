@@ -11,7 +11,9 @@ from build.lineups import owner_for_team, season_has_results
 # The league runs two separate drafts each year. The main ("offensive") draft
 # includes K and team D/ST; the defensive draft is individual defenders only
 # (3 rounds: DL/LB/DB). Everything side-specific keys off position.
-_OFF_POS = {"QB", "RB", "WR", "TE", "K", "FB", "D/ST"}
+# ESPN spells kicker both "K" and "PK" depending on where the position is read
+# from; both must sit on the offensive side or the IDP draft grows a kicker.
+_OFF_POS = {"QB", "RB", "WR", "TE", "K", "PK", "FB", "D/ST"}
 
 
 def _side(pos):
