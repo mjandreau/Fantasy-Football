@@ -5,6 +5,7 @@ from pathlib import Path
 
 from build.metrics import standings, head_to_head, record_book, owner_careers
 from build.analytics import build_analytics, build_insights
+from build.dominance import build_dominance
 from build.lineups import build_lineups, final_standings
 from build.drafts import build_drafts
 from build.moves import build_moves, build_waivers, build_left_on_waivers
@@ -43,6 +44,7 @@ def assemble(history_path, gridiron_path, generated, espn_dir=None):
         "owner_careers": owner_careers(games, CHAMPIONS),
         "analytics": build_analytics(games),
         "insights": build_insights(games),
+        "dominance": build_dominance(games, CHAMPIONS),
     }
     # Lineup analytics need the local ESPN cache (2019+ box scores); the
     # dashboard degrades gracefully when it's absent.

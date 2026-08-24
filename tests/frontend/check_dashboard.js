@@ -110,6 +110,58 @@ function checkOdds(doc, ODDS) {
   console.log(`odds: ${years.length} seasons checked`);
 }
 
+function checkDominance(doc, DOM) {
+  if (!DOM || !DOM.seasons?.length) { console.log('dominance: no payload, skipping'); return; }
+  doc.querySelector('.nav-btn[data-tab="dominance"]').click();
+  const panel = doc.getElementById('tab-dominance');
+
+  // Renderers run once, so the chart was recorded back in checkTabs -- find it
+  // in the accumulated list rather than clearing and re-rendering.
+  // The scatter must plot every team-season exactly once, split champions
+  // from the rest -- a silently dropped season would still "render fine".
+  const scatter = window.__charts.find(c => c.type === 'scatter' &&
+    c.data.datasets.some(d => d.label === 'Champions'));
+  if (!scatter) { errors.push('dominance: no scatter drawn'); return; }
+  const plotted = scatter.data.datasets
+    .filter(d => d.data.length && d.data[0].r)
+    .reduce((a, d) => a + d.data.length, 0);
+  if (plotted !== DOM.seasons.length)
+    errors.push(`dominance: ${plotted} points plotted for ${DOM.seasons.length} team-seasons`);
+  const champs = DOM.seasons.filter(r => r.title).length;
+  const ringed = scatter.data.datasets.find(d => d.label === 'Champions');
+  if (!ringed || ringed.data.length !== champs)
+    errors.push(`dominance: ${ringed ? ringed.data.length : 0} champions ringed, expected ${champs}`);
+
+  const tables = [...panel.querySelectorAll('table.data-table')];
+  if (tables.length < 2) { errors.push(`dominance: ${tables.length} tables, expected 2`); return; }
+  const [seasonTable, franchiseTable] = tables;
+
+  const seasonRows = seasonTable.querySelectorAll('tbody tr').length;
+  if (seasonRows !== DOM.seasons.length)
+    errors.push(`dominance: season table has ${seasonRows} rows, expected ${DOM.seasons.length}`);
+  const franchiseRows = franchiseTable.querySelectorAll('tbody tr').length;
+  if (franchiseRows !== DOM.franchises.length)
+    errors.push(`dominance: franchise table has ${franchiseRows} rows, expected ${DOM.franchises.length}`);
+
+  // Default sort is DOM descending, so row 1 must be the payload's DOM leader.
+  const best = [...DOM.seasons].sort((a, b) => b.dom - a.dom)[0];
+  const firstRow = seasonTable.querySelector('tbody tr')?.textContent || '';
+  if (!firstRow.includes(String(best.season)) || !firstRow.includes(best.owner))
+    errors.push(`dominance: top row "${firstRow.slice(0, 60)}" is not ${best.season} ${best.owner}`);
+
+  // The formula note must be the one the build actually used.
+  if (DOM.formula?.text && !panel.textContent.includes(DOM.formula.text))
+    errors.push('dominance: formula note does not match the payload formula');
+
+  // Both dynasty window lengths must be reachable.
+  const pills = [...panel.querySelectorAll('.subnav-btn')].map(b => b.dataset.id).sort();
+  if (pills.join(',') !== '3,5')
+    errors.push(`dominance: dynasty pills are [${pills}], expected [3,5]`);
+
+  console.log(`dominance: ${plotted} team-seasons plotted, ${franchiseRows} franchises, ` +
+              `top season ${best.season} ${best.owner} (DOM ${best.dom.toFixed(2)})`);
+}
+
 function checkDrafts(doc, D) {
   if (!D || !D.years) { console.log('drafts: no payload, skipping'); return; }
   doc.querySelector('.nav-btn[data-tab="drafts"]').click();
@@ -139,6 +191,8 @@ setTimeout(() => {
   if (!/--gutter/.test(css)) errors.push('layout: --gutter is not defined');
 
   checkTabs(doc);
+  try { checkDominance(doc, payload().dominance); }
+  catch (err) { errors.push('dominance check threw: ' + err.stack); }
   try { checkDrafts(doc, payload().drafts); }
   catch (err) { errors.push('drafts check threw: ' + err.stack); }
   try { checkOdds(doc, payload().odds); }
