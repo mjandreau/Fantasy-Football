@@ -80,6 +80,14 @@ scores calls it (`build_lineups`, `all_time_teams`, `build_waivers`,
 because its scoring model is fit from results. The draft board itself is exempt
 — that data is real, so the newest board ships the moment the draft ends.
 
+**Kicker positions.** ESPN spells kicker both `K` and `PK` depending on where the
+position is read from. `PK` must stay in `drafts._OFF_POS` or kickers fall into
+the IDP draft — this silently put 88 kickers on the defensive side of the boards
+until it was caught in Aug 2026. From 2019 on the defensive draft comes out at
+exactly 3 rounds × teams (a test asserts it); earlier years still run over
+because ESPN no longer resolves positions for some long-retired players, which
+fall back to `-` and land on defense.
+
 ESPN facts worth remembering: player-level box scores exist **2019 onward only**;
 the per-move transaction log is **deleted** by ESPN when a season closes (only
 season counters survive); in-season pickups are reconstructed by roster-diffing
