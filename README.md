@@ -8,7 +8,7 @@ self-contained static dashboard.
 (GitHub Pages, deploy-from-branch, repo root; the root `index.html` redirects
 to `dashboard/`).
 
-## The dashboard — 11 tabs
+## The dashboard — 12 tabs
 
 `dashboard/index.html` is fully self-contained: all data is embedded as a JSON
 blob between `/*DATA_START*/…/*DATA_END*/` markers, so it opens locally or
@@ -18,28 +18,35 @@ hosts as a static file. Only Chart.js and web fonts load from CDNs.
 2. **All-Time Rankings** — standings with scope toggle (regular / incl. playoffs /
    playoffs-only + first-round byes), Power Index, trophies, finish columns,
    average-finish chart. Best = post-playoff final placement (🥇 = a title)
-3. **Season Timeline** — finish-by-season bump chart with multi-select owner
+3. **Dominance** — how far above the league a team actually was: a DOM score
+   blending scoring z-score, all-play win%, win%, playoff wins and the ring,
+   over every team-season since 2011. Scatter of scoring vs all-play with
+   champions ringed, a franchise all-time table, dynasty windows (3- and
+   5-year), and the best seasons that ended without a title. Weights live in
+   `build/dominance.py` and ship inside the payload, so the formula note on
+   the tab is the formula the build used
+4. **Season Timeline** — finish-by-season bump chart with multi-select owner
    picker; league scoring-era trend
-4. **Season-by-Season** — per-year standings, luck report (all-play), and the
+5. **Season-by-Season** — per-year standings, luck report (all-play), and the
    reconstructed championship bracket (byes, 3rd-place game, consolation collapse)
-5. **Head-to-Head** — the Domination Grid (win% heatmap, active owners by
+6. **Head-to-Head** — the Domination Grid (win% heatmap, active owners by
    default) + any-two-owners rivalry detail
-6. **League Analytics** — skill-vs-schedule luck scatter, cumulative luck lines,
+7. **League Analytics** — skill-vs-schedule luck scatter, cumulative luck lines,
    boom/bust volatility, bracket DNA, **Moves vs Glory** (churn vs finish)
-7. **Playoff Odds** — week-by-week probability of making the playoffs for
+8. **Playoff Odds** — week-by-week probability of making the playoffs for
    every season, computed point-in-time (each week sees only what was known
    then), with a full-hindsight overlay, exact clinch/elimination, and a
    schedule-luck panel (actual vs all-play record)
-8. **Lineup Lab** *(2019+)* — start/sit efficiency vs optimal lineups, Hall of
+9. **Lineup Lab** *(2019+)* — start/sit efficiency vs optimal lineups, Hall of
    Blunders, biggest benched games, **Waiver Wire Hall of Fame**, best seasons
    left on waivers
-9. **Draft Room** — the two draft boards per year (main draft incl. K/D-ST;
+10. **Draft Room** — the two draft boards per year (main draft incl. K/D-ST;
    3-round defensive IDP draft), first-overall gallery, draft grades,
    steals & busts (value = pick slot vs points rank, within each draft).
    A board appears as soon as that season drafts; grades, steals and busts
    wait until games have actually been played
-10. **Record Book** — sub-tabbed records: scores, blowouts, streaks, crowns…
-11. **Owner Deep Dive** — per-owner career, All-Time Team (best-ever player at
+11. **Record Book** — sub-tabbed records: scores, blowouts, streaks, crowns…
+12. **Owner Deep Dive** — per-owner career, All-Time Team (best-ever player at
     each of the 11 lineup slots), rivalry report, personal insights
 
 League format notes: 12 teams (10 in 2011–14; Chris Borea, Joe Kosich, and

@@ -4,8 +4,10 @@ def test_assemble_top_level_keys(league_history_path, gridiron_path):
     data, report = assemble(league_history_path, gridiron_path, generated="2026-07-28")
     for k in ("meta", "games", "champions", "team_names", "all_time_standings",
               "season_standings", "head_to_head", "record_book", "owner_careers",
-              "analytics", "insights"):
+              "analytics", "insights", "dominance"):
         assert k in data
+    assert len(data["dominance"]["seasons"]) == 172
+    assert len(data["dominance"]["franchises"]) == 15
     assert len(data["insights"]) >= 8
     assert "h2h_matrix" in data["analytics"]
     assert data["meta"]["total_games"] == 1399
