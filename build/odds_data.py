@@ -111,8 +111,12 @@ def build_odds(games, espn_dir, seasons=None, n_sims=N_SIMS, verbose=False):
         weeks_played = max((g["week"] for g in played), default=0)
         in_progress = bool(schedule) and weeks_played < fmt["reg_weeks"]
 
-        if not played and not schedule:
-            # Nothing to model: the season has neither results nor a schedule.
+        if not played:
+            # Nothing to model yet. A season that has drafted already publishes
+            # its full schedule, which is enough for season_curves to take the
+            # owners from -- but the scoring model is fit from played games and
+            # standings come from the results table, so both are empty until
+            # week 1 is in the books.
             continue
 
         curves = season_curves(games, season, fmt, n_sims=n_sims,

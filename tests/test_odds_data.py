@@ -24,7 +24,23 @@ def odds():
 
 
 def test_covers_every_played_season(odds):
-    assert odds["seasons"] == list(range(2011, 2026))
+    data = json.loads(LEAGUE_DATA.read_text(encoding="utf-8"))
+    played = sorted({g["season"] for g in data["games"] if g["phase"] == "regular"})
+    assert odds["seasons"] == played
+
+
+def test_a_drafted_season_with_no_results_is_not_modelled(odds):
+    """After a draft ESPN publishes the season's schedule, which is enough for
+    season_curves to take the owners from -- but the scoring model is fit from
+    played games, and there are none. Nothing to model until week 1."""
+    data = json.loads(LEAGUE_DATA.read_text(encoding="utf-8"))
+    played = {g["season"] for g in data["games"] if g["phase"] == "regular"}
+    scheduled = set()
+    for path in ESPN.glob("league_*.json"):
+        if json.loads(path.read_text(encoding="utf-8")).get("schedule"):
+            scheduled.add(int(path.stem.split("_")[1]))
+    for season in scheduled - played:
+        assert season not in odds["seasons"],             f"{season} has a schedule but no results -- it cannot be modelled yet"
 
 
 def test_every_season_has_one_row_per_week_plus_preseason(odds):

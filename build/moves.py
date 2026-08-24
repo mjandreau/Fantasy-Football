@@ -8,7 +8,7 @@ import json
 from collections import defaultdict
 from pathlib import Path
 
-from build.lineups import owner_for_team
+from build.lineups import owner_for_team, season_has_results
 
 
 def build_moves(espn_dir):
@@ -73,6 +73,8 @@ def build_waivers(espn_dir, top_n=15):
             drafted_by[p["player_id"]] = owner_by_id.get(p["team_id"])
         max_week = (league.get("reg_season_weeks") or 14) + 3
         data = json.loads(bs_path.read_text())
+        if not season_has_results(data):
+            continue   # drafted but not yet played
         weeks = sorted((int(w) for w in data["weeks"]), key=int)
         seen = defaultdict(set)          # owner -> player_ids seen so far
         acc = {}                          # (owner, pid) -> pickup record

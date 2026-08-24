@@ -35,7 +35,9 @@ hosts as a static file. Only Chart.js and web fonts load from CDNs.
    left on waivers
 9. **Draft Room** — the two draft boards per year (main draft incl. K/D-ST;
    3-round defensive IDP draft), first-overall gallery, draft grades,
-   steals & busts (value = pick slot vs points rank, within each draft)
+   steals & busts (value = pick slot vs points rank, within each draft).
+   A board appears as soon as that season drafts; grades, steals and busts
+   wait until games have actually been played
 10. **Record Book** — sub-tabbed records: scores, blowouts, streaks, crowns…
 11. **Owner Deep Dive** — per-owner career, All-Time Team (best-ever player at
     each of the 11 lineup slots), rivalry report, personal insights
@@ -66,6 +68,17 @@ high for 2013-2017; it does not change any seed order.
 | `data/The Gridiron.xlsx` | Validation cross-check; discrepancies → `build/reconciliation.md` | No (local) |
 | `data/espn/*.json` | ESPN cache: drafts 2011+, box scores 2019+, transaction counters, scoring rulebooks, free-agent pools, player positions | No (local) |
 | `data/espn_credentials.json` | ESPN league id + `espn_s2`/`SWID` cookies | **Never** (gitignored) |
+
+**The drafted-but-unplayed season.** The moment a draft happens, ESPN serves the
+whole upcoming season: real rosters, real lineups, an 18-week schedule — and
+every score `0.0`. Counted naively that becomes a phantom season at 100% lineup
+efficiency, pads career game totals, stretches All-Time Team spans into a year
+nobody scored in, and manufactures draft grades out of ranked zeros.
+`lineups.season_has_results()` is the single guard, and everything reading box
+scores calls it (`build_lineups`, `all_time_teams`, `build_waivers`,
+`drafts._season_points`); `build_odds` skips a season with no played games
+because its scoring model is fit from results. The draft board itself is exempt
+— that data is real, so the newest board ships the moment the draft ends.
 
 ESPN facts worth remembering: player-level box scores exist **2019 onward only**;
 the per-move transaction log is **deleted** by ESPN when a season closes (only

@@ -110,6 +110,28 @@ function checkOdds(doc, ODDS) {
   console.log(`odds: ${years.length} seasons checked`);
 }
 
+function checkDrafts(doc, D) {
+  if (!D || !D.years) { console.log('drafts: no payload, skipping'); return; }
+  doc.querySelector('.nav-btn[data-tab="drafts"]').click();
+  const panel = doc.getElementById('tab-drafts');
+  const years = Object.keys(D.years).sort();
+
+  const options = [...panel.querySelectorAll('option')].map(o => o.value).sort();
+  if (options.join(',') !== years.join(','))
+    errors.push(`drafts: year picker [${options}] does not match payload [${years}]`);
+
+  // The newest draft is the one people open the tab to see.
+  const newest = years[years.length - 1];
+  const sel = panel.querySelector('select');
+  if (sel && sel.value !== newest)
+    errors.push(`drafts: board opened on ${sel.value}, expected ${newest}`);
+  if (!panel.textContent.includes(D.years[newest].picks[0].player))
+    errors.push(`drafts: ${newest} board does not show its first pick`);
+
+  console.log(`drafts: ${years.length} boards (${years[0]}-${newest}), ` +
+              `${newest} opens on ${D.years[newest].picks[0].player}`);
+}
+
 setTimeout(() => {
   const doc = window.document;
   const css = html.match(/<style>([\s\S]*?)<\/style>/)?.[1] || '';
@@ -117,6 +139,8 @@ setTimeout(() => {
   if (!/--gutter/.test(css)) errors.push('layout: --gutter is not defined');
 
   checkTabs(doc);
+  try { checkDrafts(doc, payload().drafts); }
+  catch (err) { errors.push('drafts check threw: ' + err.stack); }
   try { checkOdds(doc, payload().odds); }
   catch (err) { errors.push('odds check threw: ' + err.stack); }
 

@@ -7,7 +7,7 @@ ROOT = Path(__file__).resolve().parent.parent
 DATA = ROOT / "data"
 BUILD = ROOT / "build"
 DASHBOARD = ROOT / "dashboard" / "index.html"
-GENERATED = "2026-08-17"  # bump when rebuilding
+GENERATED = "2026-08-24"  # bump when rebuilding
 
 
 def main():

@@ -24,10 +24,46 @@ def test_efficiency_table(lineups):
         assert r["games"] > 50                   # 7 seasons of weekly lineups
 
 
+def _seasons_with_played_games():
+    """Seasons whose box scores contain an actual result, read straight from the
+    cache so it does not inherit build_lineups' own idea of which years count."""
+    import json
+    out = set()
+    for path in ESPN_DIR.glob("boxscores_*.json"):
+        blob = json.loads(path.read_text(encoding="utf-8"))
+        if any(m.get("home_score") or m.get("away_score")
+               for week in blob["weeks"].values() for m in week):
+            out.add(path.stem.split("_")[1])
+    return out
+
+
 def test_per_season_shape(lineups):
     per = lineups["by_season"]
-    assert set(per.keys()) == {str(y) for y in range(2019, 2026)}
+    assert set(per.keys()) == _seasons_with_played_games()
     assert len(per["2025"]) == 12
+
+
+def test_all_time_team_spans_stop_at_the_last_played_season(lineups):
+    """A player still on a roster in a drafted-but-unplayed season would have
+    their span stretched into a year they never scored a point in."""
+    latest = max(int(y) for y in _seasons_with_played_games())
+    for owner, team in lineups["all_time_teams"].items():
+        for slot in team:
+            if not slot["seasons"]:
+                continue
+            end = int(slot["seasons"].split("–")[-1])
+            assert end <= latest, (
+                f"{owner} {slot['slot']} {slot['player']} spans to {end}, "
+                f"but {latest} is the last played season")
+
+
+def test_a_drafted_but_unplayed_season_is_not_counted(lineups):
+    """Once a draft happens, ESPN serves that season's full rosters against an
+    empty schedule -- 18 weeks of real lineups at zero points. Counting them
+    invents a 100%-efficiency season and pads every career game total."""
+    for season, rows in lineups["by_season"].items():
+        assert any(r["actual"] > 0 for r in rows), \
+            f"{season} was counted but nobody has scored a point"
 
 
 def test_blunders_sorted(lineups):
